@@ -1,0 +1,13 @@
+target/
+*.exe
+*.dmg
+*.deb
+*.apk
+*.so
+*.dll
+*.dylib
+.dart_tool/
+flutter/.dart_tool/
+flutter/build/
+build/
+Cargo.lock
