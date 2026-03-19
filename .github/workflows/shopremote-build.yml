@@ -1,16 +1,16 @@
 # ============================================================
 # ShopRemote - GitHub Actions 빌드 워크플로우
-# Windows(.exe) + macOS(.dmg) 자동 빌드
+# Windows(.exe) + macOS(.dmg) + Android(.apk) 자동 빌드
 # 수동 실행: Actions 탭 → shopremote-build → Run workflow
 # ============================================================
 
 name: ShopRemote Build
 
 on:
-  workflow_dispatch:  # 수동 실행
+  workflow_dispatch:
   push:
     tags:
-      - 'v*'          # v1.0.0 같은 태그 푸시 시 자동 빌드
+      - 'v*'
 
 env:
   RUST_VERSION: "1.75"
@@ -19,6 +19,8 @@ env:
   VCPKG_COMMIT_ID: "120deac3062162151622ca4860575a33844ba10b"
   VERSION: "1.4.6"
   VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
+  CARGO_NDK_VERSION: "3.1.2"
+  NDK_VERSION: "r27c"
 
 jobs:
   # ──────────────────────────────────────────
@@ -33,11 +35,12 @@ jobs:
         with:
           submodules: recursive
 
-      - name: vcpkg 캐시
-        uses: actions/cache@v4
+      - name: vcpkg 캐시 설정
+        uses: actions/github-script@v7
         with:
-          path: C:\vcpkg\installed
-          key: vcpkg-windows-${{ env.VCPKG_COMMIT_ID }}
+          script: |
+            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
 
       - name: Rust 설치
         uses: dtolnay/rust-toolchain@v1
@@ -57,66 +60,68 @@ jobs:
         with:
           version: ${{ env.LLVM_VERSION }}
 
-      - name: vcpkg 설치
-        run: |
-          cd C:\vcpkg
-          git fetch origin ${{ env.VCPKG_COMMIT_ID }}
-          git checkout ${{ env.VCPKG_COMMIT_ID }}
-          .\bootstrap-vcpkg.bat
-          .\vcpkg install --triplet x64-windows-static
+      - name: vcpkg 설치 및 캐시
+        uses: johnwason/vcpkg-action@v6
+        with:
+          pkgs: >
+            openssl
+            libyuv
+            libvpx
+          triplet: x64-windows-static
+          token: ${{ github.token }}
+          github-binarycache: true
+          revision: ${{ env.VCPKG_COMMIT_ID }}
 
       - name: Flutter 의존성
         working-directory: flutter
         run: flutter pub get
 
-      - name: Flutter bridge 생성
+      - name: flutter_rust_bridge 생성
         run: |
-          cargo install flutter_rust_bridge_codegen --version "1.80.1" --features "uuid" 2>$null
-          Push-Location flutter
-          flutter pub get
-          Pop-Location
-          flutter_rust_bridge_codegen --rust-input src/flutter_ffi.rs --dart-output flutter/lib/generated_bridge.dart
+          cargo install flutter_rust_bridge_codegen --version "1.80.1" --features "uuid"
+          cd flutter && flutter pub get
+          flutter_rust_bridge_codegen --rust-input ../src/flutter_ffi.rs --dart-output lib/generated_bridge.dart
 
       - name: Windows 빌드
         working-directory: flutter
+        env:
+          VCPKG_ROOT: ${{ github.workspace }}/vcpkg
         run: flutter build windows --release
 
-      - name: 인스톨러 패키징 (NSIS)
+      - name: 빌드 결과물 압축
         run: |
-          choco install nsis -y
-          # 빌드 결과물 복사
-          New-Item -ItemType Directory -Force -Path installer
-          Copy-Item -Recurse flutter\build\windows\x64\runner\Release\* installer\
-          # 인스톨러 생성
-          makensis /DVERSION=${{ env.VERSION }} installer\ShopRemote.nsi 2>$null || echo "NSIS skip"
-          # zip으로 대체
-          Compress-Archive -Path installer\* -DestinationPath ShopRemote-${{ env.VERSION }}-windows.zip
+          Compress-Archive -Path flutter\build\windows\x64\runner\Release\* -DestinationPath ShopRemote-${{ env.VERSION }}-windows-x64.zip
 
-      - name: 빌드 결과물 업로드
+      - name: Artifact 업로드
         uses: actions/upload-artifact@v4
         with:
           name: ShopRemote-Windows
-          path: |
-            ShopRemote-*.zip
-            flutter/build/windows/x64/runner/Release/shopremote.exe
+          path: ShopRemote-*.zip
 
   # ──────────────────────────────────────────
   # macOS 빌드
   # ──────────────────────────────────────────
   build-macos:
     name: macOS Build
-    runs-on: macos-latest
+    runs-on: macos-13
     steps:
       - name: 소스 체크아웃
         uses: actions/checkout@v4
         with:
           submodules: recursive
 
+      - name: vcpkg 캐시 설정
+        uses: actions/github-script@v7
+        with:
+          script: |
+            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+
       - name: Rust 설치
         uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: ${{ env.RUST_VERSION }}
-          targets: x86_64-apple-darwin,aarch64-apple-darwin
+          targets: x86_64-apple-darwin
 
       - name: Flutter 설치
         uses: subosito/flutter-action@v2
@@ -125,25 +130,36 @@ jobs:
           channel: stable
           cache: true
 
-      - name: LLVM + 의존성 설치
+      - name: 의존성 설치
         run: |
-          brew install llvm pkg-config
-          echo "LLVM_HOME=$(brew --prefix llvm)" >> $GITHUB_ENV
+          brew install llvm pkg-config nasm yasm
 
-      - name: vcpkg 설치
-        run: |
-          git clone https://github.com/microsoft/vcpkg.git $HOME/vcpkg
-          cd $HOME/vcpkg
-          git checkout ${{ env.VCPKG_COMMIT_ID }}
-          ./bootstrap-vcpkg.sh
-          ./vcpkg install
+      - name: vcpkg 설치 및 캐시
+        uses: johnwason/vcpkg-action@v6
+        with:
+          pkgs: >
+            openssl
+            libyuv
+            libvpx
+          triplet: x64-osx
+          token: ${{ github.token }}
+          github-binarycache: true
+          revision: ${{ env.VCPKG_COMMIT_ID }}
 
       - name: Flutter 의존성
         working-directory: flutter
         run: flutter pub get
 
+      - name: flutter_rust_bridge 생성
+        run: |
+          cargo install flutter_rust_bridge_codegen --version "1.80.1" --features "uuid"
+          cd flutter && flutter pub get
+          flutter_rust_bridge_codegen --rust-input ../src/flutter_ffi.rs --dart-output lib/generated_bridge.dart
+
       - name: macOS 빌드
         working-directory: flutter
+        env:
+          VCPKG_ROOT: ${{ github.workspace }}/vcpkg
         run: flutter build macos --release
 
       - name: DMG 패키징
@@ -155,18 +171,18 @@ jobs:
             --window-size 600 400 \
             --icon-size 100 \
             --app-drop-link 450 185 \
-            "ShopRemote-${{ env.VERSION }}.dmg" \
-            "flutter/build/macos/Build/Products/Release/shopremote.app" || \
-          cp -r flutter/build/macos/Build/Products/Release/shopremote.app . && \
-          zip -r ShopRemote-${{ env.VERSION }}-macos.zip shopremote.app
+            "ShopRemote-${{ env.VERSION }}-macos.dmg" \
+            "flutter/build/macos/Build/Products/Release/shopremote.app" \
+          || zip -r "ShopRemote-${{ env.VERSION }}-macos.zip" \
+            "flutter/build/macos/Build/Products/Release/shopremote.app"
 
-      - name: 빌드 결과물 업로드
+      - name: Artifact 업로드
         uses: actions/upload-artifact@v4
         with:
           name: ShopRemote-macOS
           path: |
             ShopRemote-*.dmg
-            ShopRemote-*-macos.zip
+            ShopRemote-*.zip
 
   # ──────────────────────────────────────────
   # Android 빌드
@@ -202,21 +218,33 @@ jobs:
       - name: Android NDK 설치
         uses: nttld/setup-ndk@v1
         with:
-          ndk-version: r27c
+          ndk-version: ${{ env.NDK_VERSION }}
+          add-to-path: true
 
       - name: cargo-ndk 설치
-        run: cargo install cargo-ndk --version "3.1.2"
+        run: cargo install cargo-ndk --version "${{ env.CARGO_NDK_VERSION }}"
+
+      - name: 의존성 설치
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libclang-dev clang cmake
 
       - name: Flutter 의존성
         working-directory: flutter
         run: flutter pub get
 
+      - name: flutter_rust_bridge 생성
+        run: |
+          cargo install flutter_rust_bridge_codegen --version "1.80.1" --features "uuid"
+          cd flutter && flutter pub get
+          flutter_rust_bridge_codegen --rust-input ../src/flutter_ffi.rs --dart-output lib/generated_bridge.dart
+
       - name: Android APK 빌드
         working-directory: flutter
         run: flutter build apk --release --split-per-abi
 
-      - name: 빌드 결과물 업로드
+      - name: Artifact 업로드
         uses: actions/upload-artifact@v4
         with:
           name: ShopRemote-Android
-          path: flutter/build/app/outputs/flutter-apk/*.apk
+          path: flutter/build/app/outputs/flutter-apk/app-*-release.apk
