@@ -19,7 +19,7 @@ env:
   VCPKG_COMMIT_ID: "120deac3062162151622ca4860575a33844ba10b"
   VERSION: "1.4.6"
   VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
-  CARGO_NDK_VERSION: "3.1.2"
+  CARGO_NDK_VERSION: "3.0.0"  # 3.1.2는 rustc 1.78 필요, 1.75 호환 버전
   NDK_VERSION: "r27c"
 
 jobs:
@@ -63,10 +63,7 @@ jobs:
       - name: vcpkg 설치 및 캐시
         uses: johnwason/vcpkg-action@v6
         with:
-          pkgs: >
-            openssl
-            libyuv
-            libvpx
+          manifest-dir: ${{ github.workspace }}
           triplet: x64-windows-static
           token: ${{ github.token }}
           github-binarycache: true
@@ -137,10 +134,7 @@ jobs:
       - name: vcpkg 설치 및 캐시
         uses: johnwason/vcpkg-action@v6
         with:
-          pkgs: >
-            openssl
-            libyuv
-            libvpx
+          manifest-dir: ${{ github.workspace }}
           triplet: x64-osx
           token: ${{ github.token }}
           github-binarycache: true
@@ -222,7 +216,7 @@ jobs:
           add-to-path: true
 
       - name: cargo-ndk 설치
-        run: cargo install cargo-ndk --version "${{ env.CARGO_NDK_VERSION }}"
+        run: cargo install cargo-ndk --version "${{ env.CARGO_NDK_VERSION }}" --locked
 
       - name: 의존성 설치
         run: |
