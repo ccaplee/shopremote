@@ -103,7 +103,9 @@ endif()
 # flutter_rust_bridge
 set(RUSTDESK_LIB_BUILD_TYPE $<IF:$<CONFIG:Debug>,debug,release>)
 message(STATUS "rustdesk lib build type: ${RUSTDESK_LIB_BUILD_TYPE}")
-set(RUSTDESK_LIB "../../target/${RUSTDESK_LIB_BUILD_TYPE}/librustdesk.dll")
+# [ShopRemote] Cargo.toml name이 shopremote로 변경됨 → libshopremote.dll
+# librustdesk.dll로 rename하여 flutter bridge 호환성 유지
+set(RUSTDESK_LIB "../../target/${RUSTDESK_LIB_BUILD_TYPE}/libshopremote.dll")
 install(FILES "${RUSTDESK_LIB}" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
 COMPONENT Runtime RENAME librustdesk.dll)
 
