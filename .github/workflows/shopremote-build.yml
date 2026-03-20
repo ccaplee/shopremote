@@ -67,15 +67,23 @@ jobs:
       - name: nasm 설치
         run: choco install nasm -y
 
-      - name: vcpkg 설치 및 캐시
-        uses: johnwason/vcpkg-action@v6
-        id: vcpkg
+      - name: vcpkg 캐시
+        uses: actions/cache@v4
         with:
-          manifest-dir: ${{ github.workspace }}
-          triplet: x64-windows-static
-          token: ${{ github.token }}
-          github-binarycache: true
-          revision: ${{ env.VCPKG_COMMIT_ID }}
+          path: |
+            ${{ github.workspace }}/vcpkg
+            ${{ github.workspace }}/vcpkg/installed
+          key: vcpkg-windows-${{ env.VCPKG_COMMIT_ID }}
+
+      - name: vcpkg 설치
+        run: |
+          if (!(Test-Path "vcpkg\bootstrap-vcpkg.bat")) {
+            git clone https://github.com/microsoft/vcpkg.git --no-shallow
+            cd vcpkg
+            git checkout ${{ env.VCPKG_COMMIT_ID }}
+            .\bootstrap-vcpkg.bat -disableMetrics
+          }
+          .\vcpkg\vcpkg install --triplet x64-windows-static --x-install-root=vcpkg\installed
 
       - name: Flutter 의존성
         working-directory: flutter
@@ -146,15 +154,21 @@ jobs:
         run: |
           brew install nasm yasm pkg-config llvm
 
-      - name: vcpkg 설치 및 캐시
-        uses: johnwason/vcpkg-action@v6
-        id: vcpkg
+      - name: vcpkg 캐시
+        uses: actions/cache@v4
         with:
-          manifest-dir: ${{ github.workspace }}
-          triplet: x64-osx
-          token: ${{ github.token }}
-          github-binarycache: true
-          revision: ${{ env.VCPKG_COMMIT_ID }}
+          path: |
+            ${{ github.workspace }}/vcpkg
+            ${{ github.workspace }}/vcpkg/installed
+          key: vcpkg-macos-${{ env.VCPKG_COMMIT_ID }}
+
+      - name: vcpkg 설치
+        run: |
+          if [ ! -f "vcpkg/bootstrap-vcpkg.sh" ]; then
+            git clone https://github.com/microsoft/vcpkg.git --no-shallow || git clone https://github.com/microsoft/vcpkg.git
+            cd vcpkg && git checkout ${{ env.VCPKG_COMMIT_ID }} && ./bootstrap-vcpkg.sh -disableMetrics && cd ..
+          fi
+          ./vcpkg/vcpkg install --triplet x64-osx --x-install-root=vcpkg/installed
 
       - name: Flutter 의존성
         working-directory: flutter
