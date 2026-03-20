@@ -1,7 +1,6 @@
 # ============================================================
 # ShopRemote - GitHub Actions 빌드 워크플로우
 # Windows(.exe) + macOS(.dmg) + Android(.apk) 자동 빌드
-# Bridge 파일은 repo에 직접 포함 (RustDesk 공식 CI 생성본)
 # ============================================================
 
 name: ShopRemote Build
@@ -13,7 +12,7 @@ on:
       - 'v*'
 
 env:
-  RUST_VERSION: "stable"  # 항상 최신 stable (현재 1.88+)
+  RUST_VERSION: "stable"
   FLUTTER_VERSION: "3.24.5"
   LLVM_VERSION: "15.0.6"
   VCPKG_COMMIT_ID: "120deac3062162151622ca4860575a33844ba10b"
@@ -35,7 +34,7 @@ jobs:
         with:
           submodules: recursive
 
-      - name: vcpkg 캐시 설정
+      - name: vcpkg 바이너리 캐시 설정
         uses: actions/github-script@v7
         with:
           script: |
@@ -48,9 +47,10 @@ jobs:
           toolchain: ${{ env.RUST_VERSION }}
           targets: x86_64-pc-windows-msvc
 
-      - uses: Swatinem/rust-cache@v2
+      - name: Rust 캐시
+        uses: Swatinem/rust-cache@v2
         with:
-          prefix-key: windows-build-v3
+          prefix-key: windows-v5
 
       - name: Flutter 설치
         uses: subosito/flutter-action@v2
@@ -64,32 +64,31 @@ jobs:
         with:
           version: ${{ env.LLVM_VERSION }}
 
-      - name: nasm 설치 (opus 빌드 필요)
+      - name: nasm 설치
         run: choco install nasm -y
 
-      - name: vcpkg 설치
-        run: |
-          git clone https://github.com/microsoft/vcpkg.git
-          cd vcpkg
-          git checkout ${{ env.VCPKG_COMMIT_ID }}
-          .\bootstrap-vcpkg.bat -disableMetrics
-          .\vcpkg integrate install
-          # manifest 모드로 vcpkg.json의 모든 의존성 설치
-          .\vcpkg install --triplet x64-windows-static --x-install-root=.\installed
+      - name: vcpkg 설치 및 캐시
+        uses: johnwason/vcpkg-action@v6
+        id: vcpkg
+        with:
+          manifest-dir: ${{ github.workspace }}
+          triplet: x64-windows-static
+          token: ${{ github.token }}
+          github-binarycache: true
+          revision: ${{ env.VCPKG_COMMIT_ID }}
 
       - name: Flutter 의존성
         working-directory: flutter
         run: flutter pub get
 
-      - name: Rust 라이브러리 빌드 (Windows)
+      - name: Rust 라이브러리 빌드
         env:
           VCPKG_ROOT: ${{ github.workspace }}\vcpkg
           LIBCLANG_PATH: ${{ env.LLVM_PATH }}\bin
-          OPUS_STATIC: "1"
-          PKG_CONFIG_PATH: ${{ github.workspace }}\vcpkg\installed\x64-windows-static\lib\pkgconfig
+          VCPKG_INSTALLED_DIR: ${{ github.workspace }}\vcpkg\installed
         run: cargo build --release
 
-      - name: Windows 빌드
+      - name: Windows Flutter 빌드
         working-directory: flutter
         env:
           VCPKG_ROOT: ${{ github.workspace }}\vcpkg
@@ -118,15 +117,23 @@ jobs:
         with:
           submodules: recursive
 
+      - name: vcpkg 바이너리 캐시 설정
+        uses: actions/github-script@v7
+        with:
+          script: |
+            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+
       - name: Rust 설치
         uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: ${{ env.RUST_VERSION }}
           targets: x86_64-apple-darwin
 
-      - uses: Swatinem/rust-cache@v2
+      - name: Rust 캐시
+        uses: Swatinem/rust-cache@v2
         with:
-          prefix-key: macos-build-v3
+          prefix-key: macos-v5
 
       - name: Flutter 설치
         uses: subosito/flutter-action@v2
@@ -136,25 +143,33 @@ jobs:
           cache: true
 
       - name: 의존성 설치
-        run: brew install llvm pkg-config nasm yasm
-
-      - name: vcpkg 설치
         run: |
-          git clone https://github.com/microsoft/vcpkg.git $HOME/vcpkg
-          cd $HOME/vcpkg
-          git checkout ${{ env.VCPKG_COMMIT_ID }}
-          ./bootstrap-vcpkg.sh -disableMetrics
-          # manifest 모드로 vcpkg.json의 모든 의존성 설치
-          ./vcpkg install --triplet x64-osx --x-install-root=./installed
+          brew install nasm yasm pkg-config llvm
+
+      - name: vcpkg 설치 및 캐시
+        uses: johnwason/vcpkg-action@v6
+        id: vcpkg
+        with:
+          manifest-dir: ${{ github.workspace }}
+          triplet: x64-osx
+          token: ${{ github.token }}
+          github-binarycache: true
+          revision: ${{ env.VCPKG_COMMIT_ID }}
 
       - name: Flutter 의존성
         working-directory: flutter
         run: flutter pub get
 
-      - name: macOS 빌드
+      - name: Rust 라이브러리 빌드
+        env:
+          VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+          VCPKG_INSTALLED_DIR: ${{ github.workspace }}/vcpkg/installed
+        run: cargo build --release
+
+      - name: macOS Flutter 빌드
         working-directory: flutter
         env:
-          VCPKG_ROOT: ${{ env.HOME }}/vcpkg
+          VCPKG_ROOT: ${{ github.workspace }}/vcpkg
         run: flutter build macos --release
 
       - name: DMG 패키징
@@ -202,9 +217,10 @@ jobs:
           toolchain: ${{ env.RUST_VERSION }}
           targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
 
-      - uses: Swatinem/rust-cache@v2
+      - name: Rust 캐시
+        uses: Swatinem/rust-cache@v2
         with:
-          prefix-key: android-build-v3
+          prefix-key: android-v5
 
       - name: Flutter 설치
         uses: subosito/flutter-action@v2
@@ -226,7 +242,11 @@ jobs:
       - name: 의존성 설치
         run: |
           sudo apt-get update
-          sudo apt-get install -y libclang-dev clang cmake nasm libopus-dev
+          sudo apt-get install -y libclang-dev clang cmake nasm libopus-dev libaom-dev
+
+      - name: Flutter 의존성
+        working-directory: flutter
+        run: flutter pub get
 
       - name: Android Rust 라이브러리 빌드
         env:
@@ -238,10 +258,6 @@ jobs:
             -t x86_64 \
             -o flutter/android/app/src/main/jniLibs \
             build --release
-
-      - name: Flutter 의존성
-        working-directory: flutter
-        run: flutter pub get
 
       - name: Android APK 빌드
         working-directory: flutter
