@@ -74,7 +74,8 @@ jobs:
           git checkout ${{ env.VCPKG_COMMIT_ID }}
           .\bootstrap-vcpkg.bat -disableMetrics
           .\vcpkg integrate install
-          .\vcpkg install openssl libyuv libvpx opus --triplet x64-windows-static --classic
+          # manifest 모드로 vcpkg.json의 모든 의존성 설치
+          .\vcpkg install --triplet x64-windows-static --x-install-root=.\installed
 
       - name: Flutter 의존성
         working-directory: flutter
@@ -143,7 +144,8 @@ jobs:
           cd $HOME/vcpkg
           git checkout ${{ env.VCPKG_COMMIT_ID }}
           ./bootstrap-vcpkg.sh -disableMetrics
-          ./vcpkg install openssl libyuv libvpx --triplet x64-osx --classic
+          # manifest 모드로 vcpkg.json의 모든 의존성 설치
+          ./vcpkg install --triplet x64-osx --x-install-root=./installed
 
       - name: Flutter 의존성
         working-directory: flutter
@@ -224,7 +226,7 @@ jobs:
       - name: 의존성 설치
         run: |
           sudo apt-get update
-          sudo apt-get install -y libclang-dev clang cmake
+          sudo apt-get install -y libclang-dev clang cmake nasm libopus-dev
 
       - name: Android Rust 라이브러리 빌드
         env:
