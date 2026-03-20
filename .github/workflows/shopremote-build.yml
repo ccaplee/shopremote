@@ -64,6 +64,9 @@ jobs:
         with:
           version: ${{ env.LLVM_VERSION }}
 
+      - name: nasm 설치 (opus 빌드 필요)
+        run: choco install nasm -y
+
       - name: vcpkg 설치
         run: |
           git clone https://github.com/microsoft/vcpkg.git
