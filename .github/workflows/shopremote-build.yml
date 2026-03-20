@@ -74,7 +74,7 @@ jobs:
           git checkout ${{ env.VCPKG_COMMIT_ID }}
           .\bootstrap-vcpkg.bat -disableMetrics
           .\vcpkg integrate install
-          .\vcpkg install openssl libyuv libvpx --triplet x64-windows-static --classic
+          .\vcpkg install openssl libyuv libvpx opus --triplet x64-windows-static --classic
 
       - name: Flutter 의존성
         working-directory: flutter
@@ -84,6 +84,8 @@ jobs:
         env:
           VCPKG_ROOT: ${{ github.workspace }}\vcpkg
           LIBCLANG_PATH: ${{ env.LLVM_PATH }}\bin
+          OPUS_STATIC: "1"
+          PKG_CONFIG_PATH: ${{ github.workspace }}\vcpkg\installed\x64-windows-static\lib\pkgconfig
         run: cargo build --release
 
       - name: Windows 빌드
