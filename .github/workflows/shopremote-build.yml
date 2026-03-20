@@ -77,12 +77,18 @@ jobs:
         working-directory: flutter
         run: flutter pub get
 
+      - name: Rust 라이브러리 빌드 (Windows)
+        env:
+          VCPKG_ROOT: ${{ github.workspace }}\vcpkg
+          LIBCLANG_PATH: ${{ env.LLVM_PATH }}\bin
+        run: cargo build --release
+
       - name: Windows 빌드
         working-directory: flutter
         env:
           VCPKG_ROOT: ${{ github.workspace }}\vcpkg
           LIBCLANG_PATH: ${{ env.LLVM_PATH }}\bin
-        run: flutter build windows --release --verbose 2>&1 | Select-String -Pattern "error|cargo|rust|FAILED|failed" | Select-Object -Last 50
+        run: flutter build windows --release
 
       - name: 빌드 결과물 압축
         run: |
