@@ -71,7 +71,12 @@ jobs:
           git checkout ${{ env.VCPKG_COMMIT_ID }}
           .\bootstrap-vcpkg.bat -disableMetrics
           .\vcpkg integrate install
-          .\vcpkg install openssl:x64-windows-static libyuv:x64-windows-static libvpx:x64-windows-static
+          # manifest 모드 비활성화 후 classic 모드로 설치
+          $env:VCPKG_DISABLE_METRICS = "1"
+          .\vcpkg install `
+            --triplet x64-windows-static `
+            --x-install-root=installed `
+            openssl libyuv libvpx
 
       - name: Flutter 의존성
         working-directory: flutter
@@ -233,6 +238,9 @@ jobs:
 
       - name: Android APK 빌드
         working-directory: flutter
+        env:
+          ANDROID_NDK_HOME: ${{ env.ANDROID_NDK_ROOT }}
+          ANDROID_NDK: ${{ env.ANDROID_NDK_ROOT }}
         run: flutter build apk --release --split-per-abi
 
       - name: Artifact 업로드
