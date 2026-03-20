@@ -13,7 +13,7 @@ on:
       - 'v*'
 
 env:
-  RUST_VERSION: "1.85"
+  RUST_VERSION: "stable"  # 항상 최신 stable (현재 1.88+)
   FLUTTER_VERSION: "3.24.5"
   LLVM_VERSION: "15.0.6"
   VCPKG_COMMIT_ID: "120deac3062162151622ca4860575a33844ba10b"
