@@ -71,12 +71,10 @@ jobs:
           git checkout ${{ env.VCPKG_COMMIT_ID }}
           .\bootstrap-vcpkg.bat -disableMetrics
           .\vcpkg integrate install
-          # manifest 모드 비활성화 후 classic 모드로 설치
-          $env:VCPKG_DISABLE_METRICS = "1"
-          .\vcpkg install `
+          # --classic 플래그로 manifest 모드 비활성화
+          .\vcpkg install openssl libyuv libvpx `
             --triplet x64-windows-static `
-            --x-install-root=installed `
-            openssl libyuv libvpx
+            --classic
 
       - name: Flutter 의존성
         working-directory: flutter
@@ -236,11 +234,16 @@ jobs:
           sed -i 's/extended_text: 14.0.0/extended_text: 13.0.0/g' pubspec.yaml
           flutter pub get
 
+      - name: Android Rust 라이브러리 빌드
+        env:
+          ANDROID_NDK_HOME: ${{ env.ANDROID_NDK_ROOT }}
+        run: |
+          cargo ndk -t armeabi-v7a -t arm64-v8a -t x86_64 -o flutter/android/app/src/main/jniLibs build --release
+
       - name: Android APK 빌드
         working-directory: flutter
         env:
           ANDROID_NDK_HOME: ${{ env.ANDROID_NDK_ROOT }}
-          ANDROID_NDK: ${{ env.ANDROID_NDK_ROOT }}
         run: flutter build apk --release --split-per-abi
 
       - name: Artifact 업로드
