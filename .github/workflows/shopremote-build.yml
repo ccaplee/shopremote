@@ -82,7 +82,7 @@ jobs:
         env:
           VCPKG_ROOT: ${{ github.workspace }}\vcpkg
           LIBCLANG_PATH: ${{ env.LLVM_PATH }}\bin
-        run: flutter build windows --release
+        run: flutter build windows --release --verbose 2>&1 | Select-String -Pattern "error|cargo|rust|FAILED|failed" | Select-Object -Last 50
 
       - name: 빌드 결과물 압축
         run: |
