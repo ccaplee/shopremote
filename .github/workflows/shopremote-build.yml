@@ -162,12 +162,14 @@ jobs:
         env:
           ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
         run: |
+          # Android 크로스컴파일: linux-pkg-config 사용 불가, OPUS_STATIC으로 소스 빌드
+          export OPUS_STATIC=1
           cargo ndk \
             -t armeabi-v7a \
             -t arm64-v8a \
             -t x86_64 \
             -o flutter/android/app/src/main/jniLibs \
-            build --release --features flutter,mediacodec,linux-pkg-config
+            build --release --features flutter,mediacodec
 
       - name: Android APK 빌드
         working-directory: flutter
