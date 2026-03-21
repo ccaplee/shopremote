@@ -67,24 +67,14 @@ jobs:
       - name: nasm 설치
         run: choco install nasm -y
 
-      - name: vcpkg 캐시
-        uses: actions/cache@v4
-        with:
-          path: |
-            ${{ github.workspace }}/vcpkg
-            ${{ github.workspace }}/vcpkg/installed
-          key: vcpkg-windows-${{ env.VCPKG_COMMIT_ID }}
-
       - name: vcpkg 설치
         run: |
-          if (!(Test-Path "vcpkg\bootstrap-vcpkg.bat")) {
-            git clone https://github.com/microsoft/vcpkg.git
-            cd vcpkg
-            git fetch --unshallow 2>$null; $true
-            git checkout ${{ env.VCPKG_COMMIT_ID }}
-            .\bootstrap-vcpkg.bat -disableMetrics
-          }
-          .\vcpkg\vcpkg install --triplet x64-windows-static --x-install-root=vcpkg\installed
+          git clone https://github.com/microsoft/vcpkg.git
+          cd vcpkg
+          git checkout ${{ env.VCPKG_COMMIT_ID }}
+          .\bootstrap-vcpkg.bat -disableMetrics
+          echo "VCPKG_ROOT=$env:GITHUB_WORKSPACE\vcpkg" >> $env:GITHUB_ENV
+          .\vcpkg install --triplet x64-windows-static --x-install-root=installed
 
       - name: Flutter 의존성
         working-directory: flutter
@@ -92,15 +82,12 @@ jobs:
 
       - name: Rust 라이브러리 빌드
         env:
-          VCPKG_ROOT: ${{ github.workspace }}\vcpkg
           LIBCLANG_PATH: ${{ env.LLVM_PATH }}\bin
-          VCPKG_INSTALLED_DIR: ${{ github.workspace }}\vcpkg\installed
-        run: cargo build --release
+        run: cargo build --release --features flutter
 
       - name: Windows Flutter 빌드
         working-directory: flutter
         env:
-          VCPKG_ROOT: ${{ github.workspace }}\vcpkg
           LIBCLANG_PATH: ${{ env.LLVM_PATH }}\bin
         run: flutter build windows --release
 
@@ -277,7 +264,7 @@ jobs:
             -t arm64-v8a \
             -t x86_64 \
             -o flutter/android/app/src/main/jniLibs \
-            build --release
+            build --release --features flutter,mediacodec
 
       - name: Android APK 빌드
         working-directory: flutter
