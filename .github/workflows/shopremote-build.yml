@@ -1,6 +1,6 @@
 # ============================================================
 # ShopRemote - GitHub Actions 빌드 워크플로우
-# Windows(.exe) + macOS(.dmg) + Android(.apk) 자동 빌드
+# Windows / macOS / Android
 # ============================================================
 
 name: ShopRemote Build
@@ -14,93 +14,11 @@ on:
 env:
   RUST_VERSION: "stable"
   FLUTTER_VERSION: "3.24.5"
-  LLVM_VERSION: "15.0.6"
-  VCPKG_COMMIT_ID: "120deac3062162151622ca4860575a33844ba10b"
   VERSION: "1.4.6"
-  VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
   CARGO_NDK_VERSION: "3.0.0"
   NDK_VERSION: "r27c"
 
 jobs:
-  # ──────────────────────────────────────────
-  # Windows 빌드
-  # ──────────────────────────────────────────
-  build-windows:
-    name: Windows Build
-    runs-on: windows-2022
-    steps:
-      - name: 소스 체크아웃
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: vcpkg 바이너리 캐시 설정
-        uses: actions/github-script@v7
-        with:
-          script: |
-            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
-            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
-
-      - name: Rust 설치
-        uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: ${{ env.RUST_VERSION }}
-          targets: x86_64-pc-windows-msvc
-
-      - name: Rust 캐시
-        uses: Swatinem/rust-cache@v2
-        with:
-          prefix-key: windows-v5
-
-      - name: Flutter 설치
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-          channel: stable
-          cache: true
-
-      - name: LLVM 설치
-        uses: KyleMayes/install-llvm-action@v2
-        with:
-          version: ${{ env.LLVM_VERSION }}
-
-      - name: nasm 설치
-        run: choco install nasm -y
-
-      - name: vcpkg 설치
-        run: |
-          git clone https://github.com/microsoft/vcpkg.git
-          cd vcpkg
-          git checkout ${{ env.VCPKG_COMMIT_ID }}
-          .\bootstrap-vcpkg.bat -disableMetrics
-          echo "VCPKG_ROOT=$env:GITHUB_WORKSPACE\vcpkg" >> $env:GITHUB_ENV
-          .\vcpkg install --triplet x64-windows-static --x-install-root=installed
-
-      - name: Flutter 의존성
-        working-directory: flutter
-        run: flutter pub get
-
-      - name: Rust 라이브러리 빌드
-        env:
-          LIBCLANG_PATH: ${{ env.LLVM_PATH }}\bin
-        run: cargo build --release --features flutter
-
-      - name: Windows Flutter 빌드
-        working-directory: flutter
-        env:
-          LIBCLANG_PATH: ${{ env.LLVM_PATH }}\bin
-        run: flutter build windows --release
-
-      - name: 빌드 결과물 압축
-        run: |
-          Compress-Archive -Path flutter\build\windows\x64\runner\Release\* -DestinationPath ShopRemote-${{ env.VERSION }}-windows-x64.zip
-
-      - name: Artifact 업로드
-        uses: actions/upload-artifact@v4
-        with:
-          name: ShopRemote-Windows
-          path: ShopRemote-*.zip
-
   # ──────────────────────────────────────────
   # macOS 빌드
   # ──────────────────────────────────────────
@@ -113,13 +31,6 @@ jobs:
         with:
           submodules: recursive
 
-      - name: vcpkg 바이너리 캐시 설정
-        uses: actions/github-script@v7
-        with:
-          script: |
-            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
-            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
-
       - name: Rust 설치
         uses: dtolnay/rust-toolchain@v1
         with:
@@ -129,7 +40,7 @@ jobs:
       - name: Rust 캐시
         uses: Swatinem/rust-cache@v2
         with:
-          prefix-key: macos-v5
+          prefix-key: macos-v6
 
       - name: Flutter 설치
         uses: subosito/flutter-action@v2
@@ -138,26 +49,9 @@ jobs:
           channel: stable
           cache: true
 
-      - name: 의존성 설치
+      - name: 시스템 의존성 설치
         run: |
-          brew install nasm yasm pkg-config llvm
-
-      - name: vcpkg 캐시
-        uses: actions/cache@v4
-        with:
-          path: |
-            ${{ github.workspace }}/vcpkg
-            ${{ github.workspace }}/vcpkg/installed
-          key: vcpkg-macos-${{ env.VCPKG_COMMIT_ID }}
-
-      - name: vcpkg 설치
-        run: |
-          if [ ! -f "vcpkg/bootstrap-vcpkg.sh" ]; then
-            git clone https://github.com/microsoft/vcpkg.git
-            cd vcpkg && git fetch --unshallow 2>/dev/null || true
-            git checkout ${{ env.VCPKG_COMMIT_ID }} && ./bootstrap-vcpkg.sh -disableMetrics && cd ..
-          fi
-          ./vcpkg/vcpkg install --triplet x64-osx --x-install-root=vcpkg/installed
+          brew install nasm yasm pkg-config llvm opus aom libvpx
 
       - name: Flutter 의존성
         working-directory: flutter
@@ -165,20 +59,30 @@ jobs:
 
       - name: Rust 라이브러리 빌드
         env:
-          VCPKG_ROOT: ${{ github.workspace }}/vcpkg
-          VCPKG_INSTALLED_DIR: ${{ github.workspace }}/vcpkg/installed
-        run: cargo build --release
+          LIBCLANG_PATH: /usr/local/opt/llvm/lib
+          LIBRARY_PATH: /usr/local/lib
+          PKG_CONFIG_PATH: /usr/local/lib/pkgconfig
+        run: cargo build --release --features flutter
+
+      - name: .so → .dylib 심볼릭 링크
+        run: |
+          ls target/release/lib*.dylib || ls target/release/lib*.so || echo "파일 목록:"
+          ls target/release/ | grep -E '\.dylib|\.so'
 
       - name: macOS Flutter 빌드
         working-directory: flutter
         env:
-          VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+          PKG_CONFIG_PATH: /usr/local/lib/pkgconfig
         run: flutter build macos --release
 
       - name: DMG 패키징
         run: |
           brew install create-dmg
           APP="flutter/build/macos/Build/Products/Release/shopremote.app"
+          if [ ! -d "$APP" ]; then
+            APP=$(find flutter/build/macos -name "*.app" | head -1)
+          fi
+          echo "앱 경로: $APP"
           create-dmg \
             --volname "ShopRemote" \
             --window-pos 200 120 \
@@ -186,7 +90,7 @@ jobs:
             --icon-size 100 \
             --app-drop-link 450 185 \
             "ShopRemote-${{ env.VERSION }}-macos.dmg" "$APP" || \
-          zip -r "ShopRemote-${{ env.VERSION }}-macos.zip" "$APP"
+          tar czf "ShopRemote-${{ env.VERSION }}-macos.tar.gz" "$APP"
 
       - name: Artifact 업로드
         uses: actions/upload-artifact@v4
@@ -194,7 +98,7 @@ jobs:
           name: ShopRemote-macOS
           path: |
             ShopRemote-*.dmg
-            ShopRemote-*.zip
+            ShopRemote-*.tar.gz
 
   # ──────────────────────────────────────────
   # Android 빌드
@@ -223,7 +127,7 @@ jobs:
       - name: Rust 캐시
         uses: Swatinem/rust-cache@v2
         with:
-          prefix-key: android-v5
+          prefix-key: android-v6
 
       - name: Flutter 설치
         uses: subosito/flutter-action@v2
@@ -248,8 +152,7 @@ jobs:
           sudo apt-get install -y \
             libclang-dev clang cmake nasm \
             libopus-dev libaom-dev \
-            libvpx-dev libyuv-dev \
-            libavcodec-dev libavformat-dev libavutil-dev
+            libssl-dev pkg-config
 
       - name: Flutter 의존성
         working-directory: flutter
@@ -277,3 +180,75 @@ jobs:
         with:
           name: ShopRemote-Android
           path: flutter/build/app/outputs/flutter-apk/app-*-release.apk
+
+  # ──────────────────────────────────────────
+  # Windows 빌드
+  # ──────────────────────────────────────────
+  build-windows:
+    name: Windows Build
+    runs-on: windows-2022
+    steps:
+      - name: 소스 체크아웃
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Rust 설치
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          targets: x86_64-pc-windows-msvc
+
+      - name: Rust 캐시
+        uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: windows-v6
+
+      - name: Flutter 설치
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: LLVM 설치
+        uses: KyleMayes/install-llvm-action@v2
+        with:
+          version: "15.0.6"
+
+      - name: nasm 설치
+        run: choco install nasm -y
+
+      - name: vcpkg 설치
+        run: |
+          git clone https://github.com/microsoft/vcpkg.git
+          cd vcpkg
+          git checkout 120deac3062162151622ca4860575a33844ba10b
+          .\bootstrap-vcpkg.bat -disableMetrics
+          echo "VCPKG_ROOT=$env:GITHUB_WORKSPACE\vcpkg" >> $env:GITHUB_ENV
+          .\vcpkg install opus libvpx libyuv openssl --triplet x64-windows-static --classic
+
+      - name: Flutter 의존성
+        working-directory: flutter
+        run: flutter pub get
+
+      - name: Rust 라이브러리 빌드
+        env:
+          LIBCLANG_PATH: ${{ env.LLVM_PATH }}\bin
+        run: cargo build --release --features flutter
+
+      - name: Windows Flutter 빌드
+        working-directory: flutter
+        env:
+          LIBCLANG_PATH: ${{ env.LLVM_PATH }}\bin
+        run: flutter build windows --release
+
+      - name: 빌드 결과물 압축
+        run: |
+          Compress-Archive -Path flutter\build\windows\x64\runner\Release\* -DestinationPath ShopRemote-${{ env.VERSION }}-windows-x64.zip
+
+      - name: Artifact 업로드
+        uses: actions/upload-artifact@v4
+        with:
+          name: ShopRemote-Windows
+          path: ShopRemote-*.zip
