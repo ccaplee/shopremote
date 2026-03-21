@@ -78,8 +78,9 @@ jobs:
       - name: vcpkg 설치
         run: |
           if (!(Test-Path "vcpkg\bootstrap-vcpkg.bat")) {
-            git clone https://github.com/microsoft/vcpkg.git --no-shallow
+            git clone https://github.com/microsoft/vcpkg.git
             cd vcpkg
+            git fetch --unshallow 2>$null; $true
             git checkout ${{ env.VCPKG_COMMIT_ID }}
             .\bootstrap-vcpkg.bat -disableMetrics
           }
@@ -165,8 +166,9 @@ jobs:
       - name: vcpkg 설치
         run: |
           if [ ! -f "vcpkg/bootstrap-vcpkg.sh" ]; then
-            git clone https://github.com/microsoft/vcpkg.git --no-shallow || git clone https://github.com/microsoft/vcpkg.git
-            cd vcpkg && git checkout ${{ env.VCPKG_COMMIT_ID }} && ./bootstrap-vcpkg.sh -disableMetrics && cd ..
+            git clone https://github.com/microsoft/vcpkg.git
+            cd vcpkg && git fetch --unshallow 2>/dev/null || true
+            git checkout ${{ env.VCPKG_COMMIT_ID }} && ./bootstrap-vcpkg.sh -disableMetrics && cd ..
           fi
           ./vcpkg/vcpkg install --triplet x64-osx --x-install-root=vcpkg/installed
 
@@ -256,7 +258,11 @@ jobs:
       - name: 의존성 설치
         run: |
           sudo apt-get update
-          sudo apt-get install -y libclang-dev clang cmake nasm libopus-dev libaom-dev
+          sudo apt-get install -y \
+            libclang-dev clang cmake nasm \
+            libopus-dev libaom-dev \
+            libvpx-dev libyuv-dev \
+            libavcodec-dev libavformat-dev libavutil-dev
 
       - name: Flutter 의존성
         working-directory: flutter
