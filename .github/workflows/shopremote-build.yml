@@ -219,14 +219,25 @@ jobs:
       - name: nasm 설치
         run: choco install nasm -y
 
+      - name: vcpkg 캐시
+        uses: actions/cache@v4
+        id: vcpkg-cache
+        with:
+          path: C:\vcpkg-shopremote
+          key: vcpkg-win-x64-opus-vpx-yuv-ssl-aom-${{ hashFiles('vcpkg.json') }}
+          restore-keys: vcpkg-win-x64-opus-vpx-yuv-ssl-aom-
+
       - name: vcpkg 설치
+        if: steps.vcpkg-cache.outputs.cache-hit != 'true'
         run: |
-          git clone https://github.com/microsoft/vcpkg.git
-          cd vcpkg
+          git clone https://github.com/microsoft/vcpkg.git C:\vcpkg-shopremote
+          cd C:\vcpkg-shopremote
           git checkout 120deac3062162151622ca4860575a33844ba10b
           .\bootstrap-vcpkg.bat -disableMetrics
-          echo "VCPKG_ROOT=$env:GITHUB_WORKSPACE\vcpkg" >> $env:GITHUB_ENV
-          .\vcpkg install opus libvpx libyuv openssl --triplet x64-windows-static --classic
+          .\vcpkg install opus libvpx libyuv openssl aom --triplet x64-windows-static --classic
+
+      - name: vcpkg 환경변수 설정
+        run: echo "VCPKG_ROOT=C:\vcpkg-shopremote" >> $env:GITHUB_ENV
 
       - name: Flutter 의존성
         working-directory: flutter
