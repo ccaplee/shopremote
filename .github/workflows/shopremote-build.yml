@@ -158,12 +158,55 @@ jobs:
         working-directory: flutter
         run: flutter pub get
 
-      - name: Android Rust 라이브러리 빌드
+      - name: opus 크로스컴파일 (Android용)
         env:
           ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
         run: |
-          # Android 크로스컴파일: linux-pkg-config 사용 불가, OPUS_STATIC으로 소스 빌드
-          export OPUS_STATIC=1
+          # opus 소스 빌드 후 가짜 vcpkg 경로 구성
+          mkdir -p /tmp/vcpkg-android/installed/arm64-android/{lib,include}
+          mkdir -p /tmp/vcpkg-android/installed/arm-android/{lib,include}
+          mkdir -p /tmp/vcpkg-android/installed/x64-android/{lib,include}
+
+          # opus 소스 다운로드 및 크로스컴파일
+          wget -q https://downloads.xiph.org/releases/opus/opus-1.5.2.tar.gz
+          tar xf opus-1.5.2.tar.gz
+          cd opus-1.5.2
+
+          for ARCH in arm64-v8a armeabi-v7a x86_64; do
+            case $ARCH in
+              arm64-v8a)
+                HOST=aarch64-linux-android
+                TRIPLET=arm64-android
+                ;;
+              armeabi-v7a)
+                HOST=armv7a-linux-androideabi
+                TRIPLET=arm-android
+                ;;
+              x86_64)
+                HOST=x86_64-linux-android
+                TRIPLET=x64-android
+                ;;
+            esac
+
+            NDK_BIN=${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin
+            CC=$NDK_BIN/${HOST}21-clang
+            AR=$NDK_BIN/llvm-ar
+
+            ./configure --host=$HOST CC=$CC AR=$AR \
+              --enable-static --disable-shared --disable-doc --prefix=/tmp/opus-$ARCH \
+              2>/dev/null
+            make -j$(nproc) install 2>/dev/null
+
+            cp /tmp/opus-$ARCH/lib/libopus.a /tmp/vcpkg-android/installed/$TRIPLET/lib/
+            cp -r /tmp/opus-$ARCH/include/* /tmp/vcpkg-android/installed/$TRIPLET/include/
+          done
+          echo "opus 크로스컴파일 완료"
+
+      - name: Android Rust 라이브러리 빌드
+        env:
+          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+          VCPKG_ROOT: /tmp/vcpkg-android
+        run: |
           cargo ndk \
             -t armeabi-v7a \
             -t arm64-v8a \
