@@ -1,4 +1,5 @@
-use librustdesk::*;
+// [ShopRemote] librustdesk → libshopremote (Cargo.toml name 변경)
+use libshopremote::*;
 
 #[cfg(not(target_os = "macos"))]
 fn main() {}
