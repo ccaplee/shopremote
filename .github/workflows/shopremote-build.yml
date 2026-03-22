@@ -184,6 +184,16 @@ jobs:
         env:
           ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
           VCPKG_ROOT: /tmp/vcpkg-android
+          # bindgen이 크로스컴파일 시 NDK sysroot를 쓰도록 강제
+          BINDGEN_EXTRA_CLANG_ARGS_aarch64-linux-android: >-
+            --sysroot=${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/sysroot
+            --target=aarch64-linux-android21
+          BINDGEN_EXTRA_CLANG_ARGS_armv7-linux-androideabi: >-
+            --sysroot=${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/sysroot
+            --target=armv7-linux-androideabi21
+          BINDGEN_EXTRA_CLANG_ARGS_x86_64-linux-android: >-
+            --sysroot=${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/sysroot
+            --target=x86_64-linux-android21
         run: |
           cargo ndk \
             -t armeabi-v7a \
