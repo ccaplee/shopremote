@@ -162,39 +162,46 @@ jobs:
         env:
           ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
         run: |
-          NDK_BIN=${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin
+          NDK=${{ steps.setup-ndk.outputs.ndk-path }}
+          TOOLCHAIN=$NDK/toolchains/llvm/prebuilt/linux-x86_64
           mkdir -p /tmp/vcpkg-android/installed/{arm64-android,arm-android,x64-android}/{lib,include}
 
           wget -q https://downloads.xiph.org/releases/opus/opus-1.5.2.tar.gz
           tar xf opus-1.5.2.tar.gz
 
-          SYSROOT=${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/sysroot
-
           build_opus() {
-            local ARCH=$1 HOST=$2 CC_BIN=$3 TRIPLET=$4
-            echo "Building opus for $ARCH..."
-            cp -r opus-1.5.2 opus-build-$ARCH
-            cd opus-build-$ARCH
-            ./configure --host=$HOST \
-              CC="$NDK_BIN/$CC_BIN --sysroot=$SYSROOT" \
-              AR=$NDK_BIN/llvm-ar \
-              RANLIB=$NDK_BIN/llvm-ranlib \
-              --enable-static --disable-shared --disable-doc \
-              --prefix=/tmp/opus-$ARCH
-            make -j$(nproc)
-            make install
+            local ARCH=$1 ABI=$2 TRIPLET=$3
+            echo "=== Building opus for $ARCH ==="
+            cp -r opus-1.5.2 opus-build-$ARCH && cd opus-build-$ARCH
+
+            export CC=$TOOLCHAIN/bin/${ABI}21-clang
+            export CXX=$TOOLCHAIN/bin/${ABI}21-clang++
+            export AR=$TOOLCHAIN/bin/llvm-ar
+            export RANLIB=$TOOLCHAIN/bin/llvm-ranlib
+            export STRIP=$TOOLCHAIN/bin/llvm-strip
+
+            cmake -DCMAKE_TOOLCHAIN_FILE=$NDK/build/cmake/android.toolchain.cmake \
+              -DANDROID_ABI=$ARCH \
+              -DANDROID_PLATFORM=android-21 \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DOPUS_BUILD_SHARED_LIBRARY=OFF \
+              -DOPUS_BUILD_TESTING=OFF \
+              -DCMAKE_INSTALL_PREFIX=/tmp/opus-$ARCH \
+              . && cmake --build . -j$(nproc) && cmake --install .
+
             cd ..
-            cp /tmp/opus-$ARCH/lib/libopus.a /tmp/vcpkg-android/installed/$TRIPLET/lib/
-            cp -r /tmp/opus-$ARCH/include/. /tmp/vcpkg-android/installed/$TRIPLET/include/
-            echo "Done: $ARCH"
+            cp /tmp/opus-$ARCH/lib/libopus.a /tmp/vcpkg-android/installed/$TRIPLET/lib/ || \
+            find /tmp/opus-$ARCH -name "libopus.a" -exec cp {} /tmp/vcpkg-android/installed/$TRIPLET/lib/ \;
+            cp -r /tmp/opus-$ARCH/include/. /tmp/vcpkg-android/installed/$TRIPLET/include/ 2>/dev/null || \
+            find /tmp/opus-$ARCH -name "opus" -type d -exec cp -r {}/* /tmp/vcpkg-android/installed/$TRIPLET/include/ \;
+            echo "Done: $ARCH -> $(ls /tmp/vcpkg-android/installed/$TRIPLET/lib/)"
           }
 
-          build_opus arm64-v8a   aarch64-linux-android  aarch64-linux-android21-clang   arm64-android
-          build_opus armeabi-v7a armv7a-linux-androideabi armv7a-linux-androideabi21-clang arm-android
-          build_opus x86_64      x86_64-linux-android   x86_64-linux-android21-clang    x64-android
+          build_opus arm64-v8a   aarch64-linux-android  arm64-android
+          build_opus armeabi-v7a armv7a-linux-androideabi arm-android
+          build_opus x86_64      x86_64-linux-android   x64-android
 
           echo "opus 크로스컴파일 완료"
-          ls /tmp/vcpkg-android/installed/arm64-android/lib/
 
       - name: Android Rust 라이브러리 빌드
         env:
