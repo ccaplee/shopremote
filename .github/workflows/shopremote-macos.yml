@@ -1,0 +1,87 @@
+# ShopRemote macOS 빌드
+
+name: ShopRemote macOS
+
+on:
+  workflow_dispatch:
+
+env:
+  RUST_VERSION: "stable"
+  FLUTTER_VERSION: "3.24.5"
+  VERSION: "1.4.6"
+
+jobs:
+  build-macos:
+    name: macOS Build
+    runs-on: macos-13
+    steps:
+      - name: 소스 체크아웃
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Rust 설치
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          targets: x86_64-apple-darwin
+
+      - name: Rust 캐시
+        uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: macos-v7
+
+      - name: Flutter 설치
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: 의존성 설치 (brew)
+        run: |
+          brew install nasm yasm pkg-config llvm \
+            opus libyuv libvpx aom \
+            gstreamer
+
+      - name: Flutter 의존성
+        working-directory: flutter
+        run: flutter pub get
+
+      - name: Rust 라이브러리 빌드
+        env:
+          LIBCLANG_PATH: /usr/local/opt/llvm/lib
+          PKG_CONFIG_PATH: /usr/local/lib/pkgconfig:/usr/local/opt/opus/lib/pkgconfig:/usr/local/opt/libvpx/lib/pkgconfig:/usr/local/opt/libyuv/lib/pkgconfig:/usr/local/opt/aom/lib/pkgconfig
+          LIBRARY_PATH: /usr/local/lib
+        run: cargo build --release --features flutter
+
+      - name: 빌드된 라이브러리 확인
+        run: ls -lh target/release/lib*.dylib target/release/lib*.a 2>/dev/null || ls target/release/ | grep -E "lib|dylib"
+
+      - name: macOS Flutter 빌드
+        working-directory: flutter
+        env:
+          PKG_CONFIG_PATH: /usr/local/lib/pkgconfig:/usr/local/opt/opus/lib/pkgconfig
+        run: flutter build macos --release
+
+      - name: DMG 패키징
+        run: |
+          brew install create-dmg
+          APP=$(find flutter/build/macos -name "*.app" | head -1)
+          echo "앱: $APP"
+          create-dmg \
+            --volname "ShopRemote" \
+            --window-pos 200 120 \
+            --window-size 600 400 \
+            --icon-size 100 \
+            --app-drop-link 450 185 \
+            "ShopRemote-${{ env.VERSION }}-macos.dmg" "$APP" || \
+          tar czf "ShopRemote-${{ env.VERSION }}-macos.tar.gz" "$APP"
+
+      - name: Artifact 업로드
+        uses: actions/upload-artifact@v4
+        with:
+          name: ShopRemote-macOS
+          path: |
+            ShopRemote-*.dmg
+            ShopRemote-*.tar.gz
