@@ -5,6 +5,10 @@ name: ShopRemote macOS
 on:
   workflow_dispatch:
 
+concurrency:
+  group: shopremote-macos
+  cancel-in-progress: true
+
 env:
   RUST_VERSION: "stable"
   FLUTTER_VERSION: "3.24.5"
