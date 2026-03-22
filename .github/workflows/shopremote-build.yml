@@ -168,28 +168,30 @@ jobs:
           wget -q https://downloads.xiph.org/releases/opus/opus-1.5.2.tar.gz
           tar xf opus-1.5.2.tar.gz
 
+          SYSROOT=${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/sysroot
+
           build_opus() {
             local ARCH=$1 HOST=$2 CC_BIN=$3 TRIPLET=$4
             echo "Building opus for $ARCH..."
             cp -r opus-1.5.2 opus-build-$ARCH
             cd opus-build-$ARCH
             ./configure --host=$HOST \
-              CC=$NDK_BIN/$CC_BIN \
+              CC="$NDK_BIN/$CC_BIN --sysroot=$SYSROOT" \
               AR=$NDK_BIN/llvm-ar \
               RANLIB=$NDK_BIN/llvm-ranlib \
               --enable-static --disable-shared --disable-doc \
-              --prefix=/tmp/opus-$ARCH 2>/dev/null
-            make -j$(nproc) 2>/dev/null
-            make install 2>/dev/null
+              --prefix=/tmp/opus-$ARCH
+            make -j$(nproc)
+            make install
             cd ..
             cp /tmp/opus-$ARCH/lib/libopus.a /tmp/vcpkg-android/installed/$TRIPLET/lib/
             cp -r /tmp/opus-$ARCH/include/. /tmp/vcpkg-android/installed/$TRIPLET/include/
             echo "Done: $ARCH"
           }
 
-          build_opus arm64-v8a  aarch64-linux-android  aarch64-linux-android21-clang  arm64-android
+          build_opus arm64-v8a   aarch64-linux-android  aarch64-linux-android21-clang   arm64-android
           build_opus armeabi-v7a armv7a-linux-androideabi armv7a-linux-androideabi21-clang arm-android
-          build_opus x86_64     x86_64-linux-android   x86_64-linux-android21-clang   x64-android
+          build_opus x86_64      x86_64-linux-android   x86_64-linux-android21-clang    x64-android
 
           echo "opus 크로스컴파일 완료"
           ls /tmp/vcpkg-android/installed/arm64-android/lib/
