@@ -162,45 +162,37 @@ jobs:
         env:
           ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
         run: |
-          # opus 소스 빌드 후 가짜 vcpkg 경로 구성
-          mkdir -p /tmp/vcpkg-android/installed/arm64-android/{lib,include}
-          mkdir -p /tmp/vcpkg-android/installed/arm-android/{lib,include}
-          mkdir -p /tmp/vcpkg-android/installed/x64-android/{lib,include}
+          NDK_BIN=${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin
+          mkdir -p /tmp/vcpkg-android/installed/{arm64-android,arm-android,x64-android}/{lib,include}
 
-          # opus 소스 다운로드 및 크로스컴파일
           wget -q https://downloads.xiph.org/releases/opus/opus-1.5.2.tar.gz
           tar xf opus-1.5.2.tar.gz
-          cd opus-1.5.2
 
-          for ARCH in arm64-v8a armeabi-v7a x86_64; do
-            case $ARCH in
-              arm64-v8a)
-                HOST=aarch64-linux-android
-                TRIPLET=arm64-android
-                ;;
-              armeabi-v7a)
-                HOST=armv7a-linux-androideabi
-                TRIPLET=arm-android
-                ;;
-              x86_64)
-                HOST=x86_64-linux-android
-                TRIPLET=x64-android
-                ;;
-            esac
-
-            NDK_BIN=${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin
-            CC=$NDK_BIN/${HOST}21-clang
-            AR=$NDK_BIN/llvm-ar
-
-            ./configure --host=$HOST CC=$CC AR=$AR \
-              --enable-static --disable-shared --disable-doc --prefix=/tmp/opus-$ARCH \
-              2>/dev/null
-            make -j$(nproc) install 2>/dev/null
-
+          build_opus() {
+            local ARCH=$1 HOST=$2 CC_BIN=$3 TRIPLET=$4
+            echo "Building opus for $ARCH..."
+            cp -r opus-1.5.2 opus-build-$ARCH
+            cd opus-build-$ARCH
+            ./configure --host=$HOST \
+              CC=$NDK_BIN/$CC_BIN \
+              AR=$NDK_BIN/llvm-ar \
+              RANLIB=$NDK_BIN/llvm-ranlib \
+              --enable-static --disable-shared --disable-doc \
+              --prefix=/tmp/opus-$ARCH 2>/dev/null
+            make -j$(nproc) 2>/dev/null
+            make install 2>/dev/null
+            cd ..
             cp /tmp/opus-$ARCH/lib/libopus.a /tmp/vcpkg-android/installed/$TRIPLET/lib/
-            cp -r /tmp/opus-$ARCH/include/* /tmp/vcpkg-android/installed/$TRIPLET/include/
-          done
+            cp -r /tmp/opus-$ARCH/include/. /tmp/vcpkg-android/installed/$TRIPLET/include/
+            echo "Done: $ARCH"
+          }
+
+          build_opus arm64-v8a  aarch64-linux-android  aarch64-linux-android21-clang  arm64-android
+          build_opus armeabi-v7a armv7a-linux-androideabi armv7a-linux-androideabi21-clang arm-android
+          build_opus x86_64     x86_64-linux-android   x86_64-linux-android21-clang   x64-android
+
           echo "opus 크로스컴파일 완료"
+          ls /tmp/vcpkg-android/installed/arm64-android/lib/
 
       - name: Android Rust 라이브러리 빌드
         env:
