@@ -2,7 +2,7 @@
 // ShopRemote - main.rs
 // Rust 백엔드 진입점
 // [ShopRemote] 원격 제어 코어 엔진
-// RustDesk AGPL-3.0 기반, 브랜드/설정만 수정
+// ShopRemote - RustDesk 오픈소스(AGPL-3.0) 기반
 // 수정일: 2026-03-19
 // ============================================================
 #![cfg_attr(
