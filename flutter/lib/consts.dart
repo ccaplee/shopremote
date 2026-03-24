@@ -2,7 +2,7 @@
 // ShopRemote - consts.dart
 // 앱 전역 상수 정의 파일
 // [ShopRemote] 브랜드 관련 URL, 문자열은 shopremote.kr 기준으로 수정됨
-// 원래 rustdesk.com 링크들은 모두 shopremote.kr로 교체
+// ShopRemote 브랜드 URL 설정 (shopremote.kr)
 // ============================================================
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -28,7 +28,7 @@ const String kPlatformAdditionsHeadless = "headless";
 const String kPlatformAdditionsIsInstalled = "is_installed";
 const String kPlatformAdditionsIddImpl = "idd_impl";
 const String kPlatformAdditionsShopRemoteVirtualDisplays =
-    "rustdesk_virtual_displays";
+    "shopremote_virtual_displays";
 const String kPlatformAdditionsAmyuniVirtualDisplays =
     "amyuni_virtual_displays";
 const String kPlatformAdditionsHasFileClipboard = "has_file_clipboard";
@@ -236,7 +236,7 @@ const String kKeyReverseMouseWheel = "reverse_mouse_wheel";
 const String kMsgboxTextWaitingForImage = 'Connected, waiting for image...';
 
 // the executable name of the portable version
-const String kEnvPortableExecutable = "RUSTDESK_APPNAME";
+const String kEnvPortableExecutable = "SHOPREMOTE_APPNAME";
 
 const Color kColorWarn = Color.fromARGB(255, 245, 133, 59);
 const Color kColorCanvas = Colors.black;
