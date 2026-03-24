@@ -1,4 +1,5 @@
 # ShopRemote macOS 빌드
+# 수정: macos-13 → macos-15 (Apple Silicon), targets에 aarch64 추가
 
 name: ShopRemote macOS
 
@@ -17,7 +18,7 @@ env:
 jobs:
   build-macos:
     name: macOS Build
-    runs-on: macos-13
+    runs-on: macos-15
     steps:
       - name: 소스 체크아웃
         uses: actions/checkout@v4
@@ -28,12 +29,12 @@ jobs:
         uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: ${{ env.RUST_VERSION }}
-          targets: x86_64-apple-darwin
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
 
       - name: Rust 캐시
         uses: Swatinem/rust-cache@v2
         with:
-          prefix-key: macos-v7
+          prefix-key: macos-v8
 
       - name: Flutter 설치
         uses: subosito/flutter-action@v2
@@ -54,9 +55,9 @@ jobs:
 
       - name: Rust 라이브러리 빌드
         env:
-          LIBCLANG_PATH: /usr/local/opt/llvm/lib
-          PKG_CONFIG_PATH: /usr/local/lib/pkgconfig:/usr/local/opt/opus/lib/pkgconfig:/usr/local/opt/libvpx/lib/pkgconfig:/usr/local/opt/libyuv/lib/pkgconfig:/usr/local/opt/aom/lib/pkgconfig
-          LIBRARY_PATH: /usr/local/lib
+          LIBCLANG_PATH: /opt/homebrew/opt/llvm/lib
+          PKG_CONFIG_PATH: /opt/homebrew/lib/pkgconfig:/opt/homebrew/opt/opus/lib/pkgconfig:/opt/homebrew/opt/libvpx/lib/pkgconfig:/opt/homebrew/opt/libyuv/lib/pkgconfig:/opt/homebrew/opt/aom/lib/pkgconfig
+          LIBRARY_PATH: /opt/homebrew/lib
         run: cargo build --release --features flutter
 
       - name: 빌드된 라이브러리 확인
@@ -65,7 +66,7 @@ jobs:
       - name: macOS Flutter 빌드
         working-directory: flutter
         env:
-          PKG_CONFIG_PATH: /usr/local/lib/pkgconfig:/usr/local/opt/opus/lib/pkgconfig
+          PKG_CONFIG_PATH: /opt/homebrew/lib/pkgconfig:/opt/homebrew/opt/opus/lib/pkgconfig
         run: flutter build macos --release
 
       - name: DMG 패키징
