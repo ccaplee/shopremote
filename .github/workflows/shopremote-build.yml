@@ -1,6 +1,7 @@
 # ============================================================
 # ShopRemote - GitHub Actions 빌드 워크플로우
 # Windows / macOS / Android
+# 수정: macos-13 → macos-15, Apple Silicon 경로, 캐시키 갱신
 # ============================================================
 
 name: ShopRemote Build
@@ -24,7 +25,7 @@ jobs:
   # ──────────────────────────────────────────
   build-macos:
     name: macOS Build
-    runs-on: macos-13
+    runs-on: macos-15
     steps:
       - name: 소스 체크아웃
         uses: actions/checkout@v4
@@ -35,12 +36,12 @@ jobs:
         uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: ${{ env.RUST_VERSION }}
-          targets: x86_64-apple-darwin
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
 
       - name: Rust 캐시
         uses: Swatinem/rust-cache@v2
         with:
-          prefix-key: macos-v6
+          prefix-key: macos-v8
 
       - name: Flutter 설치
         uses: subosito/flutter-action@v2
@@ -56,23 +57,22 @@ jobs:
       - name: Flutter 의존성
         working-directory: flutter
         run: flutter pub get
-
       - name: Rust 라이브러리 빌드
         env:
-          LIBCLANG_PATH: /usr/local/opt/llvm/lib
-          LIBRARY_PATH: /usr/local/lib
-          PKG_CONFIG_PATH: /usr/local/lib/pkgconfig
+          LIBCLANG_PATH: /opt/homebrew/opt/llvm/lib
+          LIBRARY_PATH: /opt/homebrew/lib
+          PKG_CONFIG_PATH: /opt/homebrew/lib/pkgconfig:/opt/homebrew/opt/opus/lib/pkgconfig:/opt/homebrew/opt/libvpx/lib/pkgconfig:/opt/homebrew/opt/aom/lib/pkgconfig
         run: cargo build --release --features flutter
 
-      - name: .so → .dylib 심볼릭 링크
+      - name: 빌드된 라이브러리 확인
         run: |
-          ls target/release/lib*.dylib || ls target/release/lib*.so || echo "파일 목록:"
-          ls target/release/ | grep -E '\.dylib|\.so'
+          ls target/release/lib*.dylib || ls target/release/lib*.so || echo "No libs"
+          ls target/release/ | grep -E "\.dylib|\.so"
 
       - name: macOS Flutter 빌드
         working-directory: flutter
         env:
-          PKG_CONFIG_PATH: /usr/local/lib/pkgconfig
+          PKG_CONFIG_PATH: /opt/homebrew/lib/pkgconfig:/opt/homebrew/opt/opus/lib/pkgconfig
         run: flutter build macos --release
 
       - name: DMG 패키징
@@ -82,7 +82,7 @@ jobs:
           if [ ! -d "$APP" ]; then
             APP=$(find flutter/build/macos -name "*.app" | head -1)
           fi
-          echo "앱 경로: $APP"
+          echo "앱: $APP"
           create-dmg \
             --volname "ShopRemote" \
             --window-pos 200 120 \
@@ -99,7 +99,6 @@ jobs:
           path: |
             ShopRemote-*.dmg
             ShopRemote-*.tar.gz
-
   # ──────────────────────────────────────────
   # Android 빌드
   # ──────────────────────────────────────────
@@ -157,25 +156,14 @@ jobs:
       - name: Flutter 의존성
         working-directory: flutter
         run: flutter pub get
-
       - name: opus Android용 준비 (vcpkg 가짜 경로)
         run: |
-          # magnum-opus가 vcpkg에서 opus를 찾으므로 가짜 경로 구성
-          # Android 빌드 시 실제 opus는 cargo-ndk가 NDK에서 처리
           for TRIPLET in arm64-android arm-android x64-android; do
-            mkdir -p /tmp/vcpkg-android/installed/$TRIPLET/{lib,include/opus}
+            mkdir -p /tmp/vcpkg-android/installed/$TRIPLET/include/opus
+            mkdir -p /tmp/vcpkg-android/installed/$TRIPLET/lib
+            cp /usr/include/opus/*.h /tmp/vcpkg-android/installed/$TRIPLET/include/opus/
+            cp /usr/lib/x86_64-linux-gnu/libopus.a /tmp/vcpkg-android/installed/$TRIPLET/lib/ 2>/dev/null || true
           done
-
-          # opus 헤더만 시스템에서 복사 (libopus-dev에서)
-          cp -r /usr/include/opus/. /tmp/vcpkg-android/installed/arm64-android/include/opus/
-          cp -r /usr/include/opus/. /tmp/vcpkg-android/installed/arm-android/include/opus/
-          cp -r /usr/include/opus/. /tmp/vcpkg-android/installed/x64-android/include/opus/
-
-          # libopus.a를 각 triplet에 복사 (x86_64 버전 - 헤더 체크용)
-          cp /usr/lib/x86_64-linux-gnu/libopus.a /tmp/vcpkg-android/installed/arm64-android/lib/ 2>/dev/null || true
-          cp /usr/lib/x86_64-linux-gnu/libopus.a /tmp/vcpkg-android/installed/arm-android/lib/ 2>/dev/null || true
-          cp /usr/lib/x86_64-linux-gnu/libopus.a /tmp/vcpkg-android/installed/x64-android/lib/ 2>/dev/null || true
-
           echo "vcpkg 경로 구성 완료"
           ls /tmp/vcpkg-android/installed/arm64-android/include/opus/
           ls /tmp/vcpkg-android/installed/arm64-android/lib/
@@ -184,13 +172,12 @@ jobs:
         env:
           ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
           VCPKG_ROOT: /tmp/vcpkg-android
-          # bindgen이 크로스컴파일 시 NDK sysroot를 쓰도록 강제
           BINDGEN_EXTRA_CLANG_ARGS_aarch64-linux-android: >-
             --sysroot=${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/sysroot
             --target=aarch64-linux-android21
           BINDGEN_EXTRA_CLANG_ARGS_armv7-linux-androideabi: >-
             --sysroot=${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/sysroot
-            --target=armv7-linux-androideabi21
+            --target=armv7a-linux-androideabi21
           BINDGEN_EXTRA_CLANG_ARGS_x86_64-linux-android: >-
             --sysroot=${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/sysroot
             --target=x86_64-linux-android21
@@ -213,7 +200,6 @@ jobs:
         with:
           name: ShopRemote-Android
           path: flutter/build/app/outputs/flutter-apk/app-*-release.apk
-
   # ──────────────────────────────────────────
   # Windows 빌드
   # ──────────────────────────────────────────
