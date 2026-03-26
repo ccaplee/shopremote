@@ -14,3 +14,8 @@ rustflags = [
 #]
 [net]
 git-fetch-with-cli = true
+
+# ShopRemote 빌드 환경변수 - cargo build 직접 실행 시에도 서버키와 주소가 자동 주입됨
+[env]
+RS_PUB_KEY = "r8Mxm2lf9f5l9MGHufGp7aPiMEHcygeCPhcdps30b5w="
+RENDEZVOUS_SERVER = "ai.ilv.co.kr"

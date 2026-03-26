@@ -11,6 +11,12 @@ import argparse
 import sys
 from pathlib import Path
 
+# ShopRemote 서버 공개키 - 빌드 시 Rust의 option_env!("RS_PUB_KEY") 매크로가 이 값을 읽어감
+# 서버(ai.ilv.co.kr)의 id_ed25519.pub 키를 하드코딩하여 클라이언트가 자동으로 서버 인증 가능
+os.environ['RS_PUB_KEY'] = 'r8Mxm2lf9f5l9MGHufGp7aPiMEHcygeCPhcdps30b5w='
+# ShopRemote 기본 렌데뷰 서버 주소 설정
+os.environ['RENDEZVOUS_SERVER'] = 'ai.ilv.co.kr'
+
 windows = platform.platform().startswith('Windows')
 osx = platform.platform().startswith(
     'Darwin') or platform.platform().startswith("macOS")
@@ -297,8 +303,8 @@ Section: net
 Priority: optional
 Version: %s
 Architecture: %s
-Maintainer: shopremote <info@sc.ilv.co.kr>
-Homepage: https://sc.ilv.co.kr
+Maintainer: shopremote <info@ai.ilv.co.kr>
+Homepage: https://ai.ilv.co.kr
 Depends: libgtk-3-0, libxcb-randr0, libxdo3 | libxdo4, libxfixes3, libxcb-shape0, libxcb-xfixes0, libasound2, libsystemd0, curl, libva2, libva-drm2, libva-x11-2, libgstreamer-plugins-base1.0-0, libpam0g, gstreamer1.0-pipewire%s
 Recommends: libayatana-appindicator3-1
 Description: A remote control software.

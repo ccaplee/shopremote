@@ -11,7 +11,7 @@ RustDesk 1.4.6 오픈소스 기반으로 ShopRemote 브랜드로 커스터마이
 | rustdesk | shopremote |
 | carriez | ShopRemote Inc |
 | info@rustdesk.com | support@shopremote.kr |
-| https://rustdesk.com | https://sc.ilv.co.kr |
+| https://rustdesk.com | https://ai.ilv.co.kr |
 | com.carriez.RustDesk | com.shopremote.app |
 
 ### 수정된 파일
@@ -21,7 +21,7 @@ RustDesk 1.4.6 오픈소스 기반으로 ShopRemote 브랜드로 커스터마이
 - `src/ui/*.tis` — UI URL
 - `flutter/pubspec.yaml` — 앱 설명
 - `flutter/lib/main.dart` — 앱 진입점 주석
-- `flutter/lib/common.dart` — **기본 서버 sc.ilv.co.kr 설정**
+- `flutter/lib/common.dart` — **기본 서버 ai.ilv.co.kr 설정**
 - `flutter/lib/consts.dart` — 브랜드 URL
 - `flutter/lib/**/*.dart` — 전체 브랜드명 교체
 - `flutter/macos/Runner/Info.plist` — macOS 앱 정보
@@ -34,8 +34,8 @@ RustDesk 1.4.6 오픈소스 기반으로 ShopRemote 브랜드로 커스터마이
 ```
 flutter/lib/common.dart, 약 2906라인
 ServerConfig.fromOptions()
-idServer 기본값: "sc.ilv.co.kr"
-relayServer 기본값: "sc.ilv.co.kr"
+idServer 기본값: "ai.ilv.co.kr"
+relayServer 기본값: "ai.ilv.co.kr"
 Public Key: r8Mxm2lf9f5l9MGHufGp7aPiMEHcygeCPhcdps30b5w=
 ```
 사용자가 설정 > 네트워크에서 변경 가능.

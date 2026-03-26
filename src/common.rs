@@ -950,7 +950,7 @@ pub fn check_software_update() {
 }
 
 // No need to check `danger_accept_invalid_cert` for now.
-// Because the url is always `https://api.sc.ilv.co.kr/version/latest`.
+// Because the url is always `https://api.ai.ilv.co.kr/version/latest`.
 #[tokio::main(flavor = "current_thread")]
 pub async fn do_check_software_update() -> hbb_common::ResultType<()> {
     let (request, url) =
@@ -1081,12 +1081,12 @@ fn get_api_server_(api: String, custom: String) -> String {
             return format!("http://{}", s);
         }
     }
-    "https://sc.ilv.co.kr".to_owned()
+    "https://ai.ilv.co.kr".to_owned()
 }
 
 #[inline]
 pub fn is_public(url: &str) -> bool {
-    url.contains("sc.ilv.co.kr/") || url.ends_with("sc.ilv.co.kr")
+    url.contains("ai.ilv.co.kr/") || url.ends_with("ai.ilv.co.kr")
 }
 
 pub fn get_udp_punch_enabled() -> bool {
@@ -2464,25 +2464,25 @@ mod tests {
 
     #[test]
     fn test_is_public() {
-        // Test URLs containing "sc.ilv.co.kr/"
-        assert!(is_public("https://sc.ilv.co.kr/"));
-        assert!(is_public("https://www.sc.ilv.co.kr/"));
-        assert!(is_public("https://api.sc.ilv.co.kr/v1"));
-        assert!(is_public("https://sc.ilv.co.kr/path"));
+        // Test URLs containing "ai.ilv.co.kr/"
+        assert!(is_public("https://ai.ilv.co.kr/"));
+        assert!(is_public("https://www.ai.ilv.co.kr/"));
+        assert!(is_public("https://api.ai.ilv.co.kr/v1"));
+        assert!(is_public("https://ai.ilv.co.kr/path"));
 
-        // Test URLs ending with "sc.ilv.co.kr"
-        assert!(is_public("sc.ilv.co.kr"));
-        assert!(is_public("https://sc.ilv.co.kr"));
-        assert!(is_public("http://www.sc.ilv.co.kr"));
-        assert!(is_public("https://api.sc.ilv.co.kr"));
+        // Test URLs ending with "ai.ilv.co.kr"
+        assert!(is_public("ai.ilv.co.kr"));
+        assert!(is_public("https://ai.ilv.co.kr"));
+        assert!(is_public("http://www.ai.ilv.co.kr"));
+        assert!(is_public("https://api.ai.ilv.co.kr"));
 
         // Test non-public URLs
         assert!(!is_public("https://example.com"));
         assert!(!is_public("https://custom-server.com"));
         assert!(!is_public("http://192.168.1.1"));
         assert!(!is_public("localhost"));
-        assert!(!is_public("https://sc.ilv.co.kr.computer.com"));
-        assert!(!is_public("sc.ilv.co.krhello.com"));
+        assert!(!is_public("https://ai.ilv.co.kr.computer.com"));
+        assert!(!is_public("ai.ilv.co.krhello.com"));
     }
 
     #[test]

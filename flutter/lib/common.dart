@@ -7,7 +7,7 @@
 //   - Rust FFI 호출 래퍼 함수 (Rust 네이티브 코드 호출)
 //   - 공통 다이얼로그 (알림, 확인, 입력)
 //   - 플랫폼별 유틸리티 (파일 경로, 권한 체크 등)
-//   - ServerConfig 클래스 (기본 서버: sc.ilv.co.kr)
+//   - ServerConfig 클래스 (기본 서버: ai.ilv.co.kr)
 //   - 네트워크 상태 체크
 //
 // 수정 가이드:
@@ -2924,15 +2924,15 @@ class ServerConfig {
 
   /// from local options
   // [ShopRemote] 기본 서버 설정
-  // ID 서버와 릴레이 서버의 기본값을 자체 서버(sc.ilv.co.kr)로 지정
+  // ID 서버와 릴레이 서버의 기본값을 자체 서버(ai.ilv.co.kr)로 지정
   // 사용자가 설정 > 네트워크에서 언제든 변경 가능
   // 서버 변경 시 Public Key도 함께 업데이트 필요
   // Public Key: r8Mxm2lf9f5l9MGHufGp7aPiMEHcygeCPhcdps30b5w=
   ServerConfig.fromOptions(Map<String, dynamic> options)
-      : idServer = options['custom-rendezvous-server'] ?? "sc.ilv.co.kr",
-        relayServer = options['relay-server'] ?? "sc.ilv.co.kr",
+      : idServer = options['custom-rendezvous-server'] ?? "ai.ilv.co.kr",
+        relayServer = options['relay-server'] ?? "ai.ilv.co.kr",
         apiServer = options['api-server'] ?? "",
-        key = options['key'] ?? "";
+        key = options['key'] ?? "r8Mxm2lf9f5l9MGHufGp7aPiMEHcygeCPhcdps30b5w=";
 }
 
 Widget dialogButton(String text,
