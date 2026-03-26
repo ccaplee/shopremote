@@ -1,3 +1,29 @@
+// ============================================================================
+// ShopRemote 데스크톱 설정 페이지 (desktop_setting_page.dart)
+// ============================================================================
+// 애플리케이션 전체 설정을 관리하는 페이지입니다.
+//
+// 주요 역할:
+//   1. 일반 설정 (언어, 테마, 시작 설정)
+//   2. 보안 설정 (비밀번호, 권한)
+//   3. 네트워크 설정 (서버, 프록시, 포트)
+//   4. 디스플레이 설정 (해상도, 스케일)
+//   5. 플러그인 설정
+//   6. 계정 관리
+//   7. 프린터 설정 (Windows만)
+//
+// 탭 구조:
+//   - SettingsTabKey enum: 각 탭을 정의
+//   - _TabInfo: 탭 정보 (아이콘, 레이블)
+//   - _settingTabs(): 동적 탭 목록 생성
+//   - _children(): 각 탭의 콘텐츠 위젯 생성
+//
+// 수정 가이드:
+//   - 새 탭 추가: SettingsTabKey enum에 항목 추가, _settingTabs(), _children() 확장
+//   - 설정 저장: 각 _xxxxx 클래스에서 bind.xxxxx 호출로 Rust 함수 실행
+//   - 권한/표시: switch문의 if문으로 탭 표시 여부 제어
+// ============================================================================
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -42,6 +68,13 @@ const Color _accentColor = MyTheme.accent;
 const String _kSettingPageControllerTag = 'settingPageController';
 const String _kSettingPageTabKeyTag = 'settingPageTabKey';
 
+/// 설정 탭 정보를 담는 클래스
+///
+/// 각 탭의 메타데이터:
+///   - key: 탭의 고유 ID (SettingsTabKey enum 값)
+///   - label: 탭에 표시될 텍스트 (예: "General", "Security")
+///   - unselected: 선택되지 않은 상태의 아이콘
+///   - selected: 선택된 상태의 아이콘
 class _TabInfo {
   late final SettingsTabKey key;
   late final String label;
@@ -50,6 +83,17 @@ class _TabInfo {
   _TabInfo(this.key, this.label, this.unselected, this.selected);
 }
 
+/// 설정 페이지의 탭 종류를 정의하는 Enum
+///
+/// 각 탭:
+///   - general: 일반 설정 (언어, 테마, 백그라운드 시작)
+///   - safety: 보안 설정 (비밀번호, 허가된 사용자)
+///   - network: 네트워크 설정 (서버 주소, 포트, 프록시)
+///   - display: 디스플레이 설정 (화면 크기, 품질, 비율)
+///   - plugin: 플러그인 설정
+///   - account: 계정 관리 및 로그인
+///   - printer: 프린터 설정 (Windows만)
+///   - about: 앱 정보 및 라이선스
 enum SettingsTabKey {
   general,
   safety,
@@ -61,8 +105,27 @@ enum SettingsTabKey {
   about,
 }
 
+/// 데스크톱 설정 페이지 위젯
+///
+/// 주요 기능:
+///   - 다중 탭 인터페이스로 각 설정 카테고리 제공
+///   - 초기 탭 선택 지원 (initialTabkey 파라미터)
+///   - 권한/플랫폼에 따라 동적으로 탭 표시
+///   - 정적 메서드 switch2page()로 특정 탭으로 이동 가능
 class DesktopSettingPage extends StatefulWidget {
   final SettingsTabKey initialTabkey;
+
+  /// 표시할 탭의 동적 목록 (권한 및 플랫폼에 따라 결정)
+  ///
+  /// 조건부 탭 표시:
+  ///   - general: 항상 표시
+  ///   - safety: 보안 설정이 숨겨지지 않고 발신 전용 모드 아님
+  ///   - network: 네트워크 설정이 숨겨지지 않음
+  ///   - display: 수신 전용 모드 아님
+  ///   - plugin: 플러그인 기능 활성화되고 웹/수신 전용 아님
+  ///   - account: 계정 기능 활성화됨
+  ///   - printer: Windows 전용, 프린터 설정이 숨겨지지 않음
+  ///   - about: 항상 표시
   static final List<SettingsTabKey> tabKeys = [
     SettingsTabKey.general,
     if (!isWeb &&
@@ -89,6 +152,15 @@ class DesktopSettingPage extends StatefulWidget {
   State<DesktopSettingPage> createState() =>
       _DesktopSettingPageState(initialTabkey);
 
+  /// 특정 설정 탭으로 이동하는 정적 메서드
+  ///
+  /// 사용 예:
+  ///   DesktopSettingPage.switch2page(SettingsTabKey.network);
+  ///
+  /// 동작:
+  ///   1. 탭 인덱스 검색
+  ///   2. PageController가 등록되어 있으면 해당 페이지로 이동
+  ///   3. 없으면 새 설정 탭 추가
   static void switch2page(SettingsTabKey page) {
     try {
       int index = tabKeys.indexOf(page);
@@ -112,6 +184,14 @@ class DesktopSettingPage extends StatefulWidget {
   }
 }
 
+/// 데스크톱 설정 페이지 상태 클래스
+///
+/// 주요 기능:
+///   - TickerProviderStateMixin: 애니메이션 제공자 역할
+///   - AutomaticKeepAliveClientMixin: 탭 전환 시에도 상태 보존
+///   - WidgetsBindingObserver: 앱 라이프사이클 감시
+///   - PageController: 탭 간 스와이프 제어
+///   - 비디오 연결 상태 모니터링 (1초마다 갱신)
 class _DesktopSettingPageState extends State<DesktopSettingPage>
     with
         TickerProviderStateMixin,

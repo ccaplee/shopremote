@@ -372,11 +372,35 @@ const SESSION_TIMEOUT: Duration = Duration::from_secs(30);
 
 impl Connection {
     /// 원격 클라이언트 연결 처리 시작
-    /// addr: 클라이언트의 네트워크 주소
-    /// stream: TCP/UDP 스트림
-    /// id: 연결 ID (각 클라이언트마다 고유)
-    /// server: 메인 서버 참조
-    /// control_permissions: 원격 제어 권한 (화면공유만 가능 등)
+    ///
+    /// 이 함수는 클라이언트가 이 PC(원격 호스트)에 접속할 때마다 호출됩니다.
+    /// 각 클라이언트마다 독립적인 Connection 구조체를 생성하여 관리합니다.
+    ///
+    /// 처리 과정:
+    ///   1. 인증 (접속 비밀번호, 토큰, 2FA 등)
+    ///   2. 권한 확인 (화면공유만 가능, 파일 전송 거부 등)
+    ///   3. 화면 캡처 시작 (클라이언트가 원격 화면 볼 수 있도록)
+    ///   4. 입력 처리 루프 시작 (마우스, 키보드, 클립보드 등)
+    ///   5. 파일 전송 처리 (요청 시)
+    ///   6. 클라이언트 연결 해제 시 정리 (세션 종료)
+    ///
+    /// 주요 구조:
+    ///   - 메시지 채널: tx/rx로 클라이언트와 통신
+    ///   - 비디오 채널: tx_video/rx_video로 화면 데이터 전송
+    ///   - 입력 채널: tx_input으로 마우스/키보드 이벤트 처리
+    ///
+    /// 보안 기능:
+    ///   - 반복된 비밀번호 실패 시 일시적 차단 (brute force 방지)
+    ///   - 2FA(Two-Factor Authentication) 지원
+    ///   - IP 주소 기반 신뢰할 수 있는 장치 등록
+    ///
+    /// 매개변수:
+    ///   - addr: 클라이언트의 네트워크 주소 및 포트
+    ///   - stream: TCP/UDP 스트림 (클라이언트와의 통신용)
+    ///   - id: 연결 ID (각 클라이언트마다 고유, 서버 내부용)
+    ///   - server: 메인 서버 참조 (다른 연결, 설정 정보 접근용)
+    ///   - control_permissions: 원격 제어 권한 설정
+    ///     (예: Some(ControlPermissions{enable_keyboard: false}) = 키보드 제어 금지)
     pub async fn start(
         addr: SocketAddr,
         stream: super::Stream,
@@ -431,8 +455,8 @@ impl Connection {
             server,
             hash,
             read_jobs: Vec::new(),
-            timer: crate::rustdesk_interval(time::interval(SEC30)),
-            file_timer: crate::rustdesk_interval(time::interval(SEC30)),
+            timer: crate::shopremote_interval(time::interval(SEC30)),
+            file_timer: crate::shopremote_interval(time::interval(SEC30)),
             file_transfer: None,
             view_camera: false,
             terminal: false,
@@ -545,7 +569,7 @@ impl Connection {
             conn.send_permission(Permission::BlockInput, false).await;
         }
         let mut test_delay_timer =
-            crate::rustdesk_interval(time::interval_at(Instant::now(), TEST_DELAY_TIMEOUT));
+            crate::shopremote_interval(time::interval_at(Instant::now(), TEST_DELAY_TIMEOUT));
         let mut last_recv_time = Instant::now();
 
         conn.stream.set_send_timeout(
@@ -558,7 +582,7 @@ impl Connection {
 
         #[cfg(not(any(target_os = "android", target_os = "ios")))]
         std::thread::spawn(move || Self::handle_input(_rx_input, tx_cloned));
-        let mut second_timer = crate::rustdesk_interval(time::interval(Duration::from_secs(1)));
+        let mut second_timer = crate::shopremote_interval(time::interval(Duration::from_secs(1)));
 
         #[cfg(feature = "unix-file-copy-paste")]
         let rx_clip_holder;
@@ -841,7 +865,7 @@ impl Connection {
                             }
                         }
                     } else {
-                        conn.file_timer = crate::rustdesk_interval(time::interval_at(Instant::now() + SEC30, SEC30));
+                        conn.file_timer = crate::shopremote_interval(time::interval_at(Instant::now() + SEC30, SEC30));
                     }
                 }
                 Ok(conns) = hbbs_rx.recv() => {
@@ -1245,11 +1269,28 @@ impl Connection {
         true
     }
 
+    /// 클라이언트 연결 초기화 및 검증
+    ///
+    /// 클라이언트 연결이 수립되었을 때 호출되는 함수입니다.
+    /// 연결이 허용되는지 확인하고, 필요한 초기 데이터를 클라이언트에 전송합니다.
+    ///
+    /// 수행 내용:
+    ///   1. IP 화이트리스트 확인 (IP 기반 접속 제한)
+    ///   2. GUI 윈도우 열림 확인 (설정: allow-only-conn-window-open)
+    ///   3. 클라이언트에 챌린지(hash) 전송 (비밀번호 검증용)
+    ///   4. 감사(Audit) 서버 주소 설정
+    ///   5. 연결 로그 기록 (API 서버로 전송)
+    ///
+    /// 반환값:
+    ///   - true: 연결 허용 (이후 로그인 처리 진행)
+    ///   - false: 연결 거부 (클라이언트 연결 종료)
     async fn on_open(&mut self, addr: SocketAddr) -> bool {
         log::debug!("#{} Connection opened from {}.", self.inner.id, addr);
+        // IP 화이트리스트 확인 (신뢰할 수 있는 네트워크에서만 접속 허용)
         if !self.check_whitelist(&addr).await {
             return false;
         }
+        // GUI 윈도우가 열려있는지 확인 (원격 제어를 위해 필요)
         #[cfg(not(any(target_os = "android", target_os = "ios")))]
         if crate::is_server() && Config::get_option("allow-only-conn-window-open") == "Y" {
             if !crate::check_process("", !crate::platform::is_root()) {
@@ -1257,7 +1298,10 @@ impl Connection {
                 return false;
             }
         }
+        // 클라이언트 IP 주소 저장 (이후 로그 및 감사에 사용)
         self.ip = addr.ip().to_string();
+        // 클라이언트에 챌린지(salt + challenge) 전송
+        // 클라이언트는 이를 이용해 비밀번호를 해시하여 전송합니다.
         let mut msg_out = Message::new();
         msg_out.set_hash(self.hash.clone());
         self.send(msg_out).await;
@@ -1282,17 +1326,29 @@ impl Connection {
         );
     }
 
+    /// 연결 감사(Audit) 정보를 API 서버로 전송
+    ///
+    /// 누가, 언제, 어느 IP에서 접속했는지 기록합니다.
+    /// 이는 보안 감시 및 접속 로그 조회에 사용됩니다.
+    ///
+    /// 기록되는 정보:
+    ///   - 로컬 PC ID (Config::get_id)
+    ///   - UUID (장치 고유 식별자)
+    ///   - 연결 ID (이번 접속의 고유 번호)
+    ///   - 세션 ID (로그인 정보)
+    ///   - 클라이언트 IP 주소
+    ///   - 액션 (new = 새로운 접속, disconnect = 접속 종료 등)
     fn post_conn_audit(&self, v: Value) {
         if self.server_audit_conn.is_empty() {
-            return;
+            return;  // 감사 서버가 설정되지 않으면 무시
         }
         let url = self.server_audit_conn.clone();
         let mut v = v;
-        v["id"] = json!(Config::get_id());
-        v["uuid"] = json!(crate::encode64(hbb_common::get_uuid()));
-        v["conn_id"] = json!(self.inner.id);
-        v["session_id"] = json!(self.lr.session_id);
-        allow_err!(self.tx_post_seq.send((url, v)));
+        v["id"] = json!(Config::get_id());  // 이 PC의 ShopRemote ID
+        v["uuid"] = json!(crate::encode64(hbb_common::get_uuid()));  // 장치 고유 ID
+        v["conn_id"] = json!(self.inner.id);  // 이번 연결의 고유 ID
+        v["session_id"] = json!(self.lr.session_id);  // 로그인 세션 ID
+        allow_err!(self.tx_post_seq.send((url, v)));  // 비동기로 전송
     }
 
     fn get_files_for_audit(job_type: fs::JobType, mut files: Vec<FileEntry>) -> Vec<(String, i64)> {
@@ -3726,7 +3782,7 @@ impl Connection {
                     let name = display.name();
                     #[cfg(windows)]
                     if let Some(_ok) =
-                        virtual_display_manager::rustdesk_idd::change_resolution_if_is_virtual_display(
+                        virtual_display_manager::shopremote_idd::change_resolution_if_is_virtual_display(
                             &name,
                             r.width as _,
                             r.height as _,
@@ -4384,7 +4440,7 @@ impl Connection {
         job.is_remote = true;
         job.conn_id = self.inner.id();
         self.read_jobs.push(job);
-        self.file_timer = crate::rustdesk_interval(time::interval(MILLI1));
+        self.file_timer = crate::shopremote_interval(time::interval(MILLI1));
         let audit_path = if job_type == fs::JobType::Printer {
             "Remote print".to_owned()
         } else {

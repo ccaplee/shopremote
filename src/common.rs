@@ -1,3 +1,29 @@
+// ============================================================================
+// ShopRemote 공통 유틸리티 모듈 (common.rs)
+// ============================================================================
+// 이 파일은 ShopRemote 애플리케이션 전체에서 사용되는 공통 함수와 상수를 정의합니다.
+//
+// 주요 기능:
+//   1. 렌데뷰 서버(ai.ilv.co.kr) 연결 설정
+//   2. NAT 타입 감지 (홀펀칭 가능 여부 판단)
+//   3. 버전 호환성 확인 (클라이언트/서버 버전)
+//   4. 장치 정보 수집 (hostname, username, 시스템 정보)
+//   5. 포트 관리 및 주소 확인
+//   6. 입력 이벤트 처리 (키보드, 마우스)
+//   7. 오디오 처리 (리샘플링, 채널 변환)
+//
+// 주요 정적 변수 (lazy_static):
+//   - SOFTWARE_UPDATE_URL: 소프트웨어 업데이트 URL (현재 비활성화)
+//   - DEVICE_ID, DEVICE_NAME: 장치 고유 정보
+//   - IS_SERVER, IS_MAIN, IS_CM: 프로그램 실행 모드 판단
+//   - PUBLIC_IPV6_ADDR: 공개 IPv6 주소 캐싱
+//
+// 수정 가이드:
+//   - 렌데뷰 서버 변경: config.rs의 RENDEZVOUS_SERVERS 수정
+//   - 버전 호환성 로직: is_support_* 함수들 수정
+//   - 새로운 공통 함수 추가: 이 파일의 하단에 추가
+// ============================================================================
+
 use std::{
     collections::HashMap,
     future::Future,
@@ -93,18 +119,34 @@ pub mod input {
 }
 
 lazy_static::lazy_static! {
+    // 소프트웨어 업데이트 URL (현재 비활성화 상태)
     pub static ref SOFTWARE_UPDATE_URL: Arc<Mutex<String>> = Default::default();
+
+    // 로컬 장치의 고유 ID (6자리 숫자 또는 사용자 정의)
     pub static ref DEVICE_ID: Arc<Mutex<String>> = Default::default();
+
+    // 로컬 장치의 이름 (커스텀 가능)
     pub static ref DEVICE_NAME: Arc<Mutex<String>> = Default::default();
+
+    // 공개 IPv6 주소 캐싱 (마지막 확인 시간과 함께)
     static ref PUBLIC_IPV6_ADDR: Arc<Mutex<(Option<SocketAddr>, Option<Instant>)>> = Default::default();
 }
 
 lazy_static::lazy_static! {
-    // Is server process, with "--server" args
+    // IS_SERVER: "--server" 명령줄 인자로 실행되는 서버 프로세스 여부
+    // 서버 모드에서는 화면 캡처, 입력 수신 등의 서버 기능을 수행합니다.
     static ref IS_SERVER: bool = std::env::args().nth(1) == Some("--server".to_owned());
-    // Is server logic running. The server code can invoked to run by the main process if --server is not running.
+
+    // SERVER_RUNNING: 서버 로직이 실제로 동작 중인지 여부
+    // "--server"로 시작되지 않은 경우에도 메인 프로세스에서 서버 로직을 호출할 수 있습니다.
     static ref SERVER_RUNNING: Arc<RwLock<bool>> = Default::default();
+
+    // IS_MAIN: 메인 프로세스(GUI 표시) 여부
+    // 명령줄 인자가 "--"로 시작하지 않으면 메인 프로세스입니다.
     static ref IS_MAIN: bool = std::env::args().nth(1).map_or(true, |arg| !arg.starts_with("--"));
+
+    // IS_CM: 연결 관리자(Connection Manager) 프로세스 여부
+    // "--cm" 또는 "--cm-no-ui" 인자로 실행될 때 true입니다.
     static ref IS_CM: bool = std::env::args().nth(1) == Some("--cm".to_owned()) || std::env::args().nth(1) == Some("--cm-no-ui".to_owned());
 }
 
@@ -683,6 +725,15 @@ async fn test_nat_type_() -> ResultType<bool> {
     Ok(ok)
 }
 
+// 렌데뷰 서버 주소 조회 (비동기)
+// 반환값:
+//   - String: 메인 렌데뷰 서버 주소 (예: "ai.ilv.co.kr:21116")
+//   - Vec<String>: 백업 렌데뷰 서버 목록
+//   - bool: 메인 서버가 설정 서버 목록에 포함되었는지 여부
+//
+// 플랫폼별 동작:
+//   - Android/iOS: 동기 호출로 config에서 직접 조회
+//   - Desktop: IPC를 통해 메인 프로세스에 요청 (리모트 호출)
 pub async fn get_rendezvous_server(ms_timeout: u64) -> (String, Vec<String>, bool) {
     #[cfg(any(target_os = "android", target_os = "ios"))]
     let (mut a, mut b) = get_rendezvous_server_(ms_timeout);
@@ -735,7 +786,10 @@ pub async fn get_nat_type(ms_timeout: u64) -> i32 {
     crate::ipc::get_nat_type(ms_timeout).await
 }
 
-// used for client to test which server is faster in case stop-servic=Y
+// 렌데뷰 서버 응답 시간 측정
+// 여러 렌데뷰 서버에 TCP 연결을 시도하여 응답 시간을 측정하고,
+// 가장 빠른 서버를 기본 서버로 설정합니다.
+// "stop-service=Y" 설정 시 호출되어 최적의 서버를 찾습니다.
 #[tokio::main(flavor = "current_thread")]
 async fn test_rendezvous_server_() {
     let servers = Config::get_rendezvous_servers();
@@ -954,7 +1008,7 @@ pub fn check_software_update() {
 #[tokio::main(flavor = "current_thread")]
 pub async fn do_check_software_update() -> hbb_common::ResultType<()> {
     let (request, url) =
-        hbb_common::version_check_request(hbb_common::VER_TYPE_RUSTDESK_CLIENT.to_string());
+        hbb_common::version_check_request(hbb_common::VER_TYPE_SHOPREMOTE_CLIENT.to_string());
     let proxy_conf = Config::get_socks();
     let tls_url = get_url_for_tls(&url, &proxy_conf);
     let tls_type = get_cached_tls_type(tls_url);
@@ -1005,6 +1059,9 @@ pub fn get_app_name() -> String {
     hbb_common::config::APP_NAME.read().unwrap().clone()
 }
 
+// ShopRemote 애플리케이션 여부 확인
+// APP_NAME이 "ShopRemote"인 경우 true 반환
+// RustDesk 포크된 버전에서는 다른 이름으로 변경될 수 있습니다.
 #[inline]
 pub fn is_shopremote() -> bool {
     hbb_common::config::APP_NAME.read().unwrap().eq("ShopRemote")
@@ -1775,8 +1832,13 @@ impl ThrottledInterval {
     }
 }
 
+// ShopRemoteInterval: 지연(throttle) 기능이 포함된 타이머 타입
+// 렌데뷰 서버와의 정기적인 통신(Keep-alive)에 사용되며,
+// 연결 지연 시 자동으로 interval을 조정합니다.
 pub type ShopRemoteInterval = ThrottledInterval;
 
+// Tokio의 Interval을 ShopRemoteInterval(ThrottledInterval)로 변환
+// 이를 통해 렌데뷰 서버 통신에 최적화된 주기 조정이 가능합니다.
 #[inline]
 pub fn shopremote_interval(i: Interval) -> ThrottledInterval {
     ThrottledInterval::new(i)

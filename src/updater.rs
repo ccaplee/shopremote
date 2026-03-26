@@ -1,3 +1,4 @@
+// ShopRemote: 자동 업데이트 비활성화 - RustDesk 공식 서버 대신 자체 서버 사용
 use crate::{common::do_check_software_update, hbbs_http::create_http_client_with_url};
 use hbb_common::{bail, config, log, ResultType};
 use std::{
@@ -118,6 +119,10 @@ fn start_auto_update_check_(rx_msg: Receiver<UpdateMsg>) {
 }
 
 fn check_update(manually: bool) -> ResultType<()> {
+    // ShopRemote: 자동 업데이트 비활성화 - RustDesk 공식 서버 대신 자체 서버 사용
+    // Always return early to prevent update checks
+    return Ok(());
+
     #[cfg(target_os = "windows")]
     let update_msi = crate::platform::is_msi_installed()? && !crate::is_custom_client();
     if !(manually || config::Config::get_bool_option(config::keys::OPTION_ALLOW_AUTO_UPDATE)) {

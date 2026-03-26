@@ -210,13 +210,27 @@ pub fn get_key_state(key: enigo::Key) -> bool {
 impl Client {
     const CLIENT_CLIPBOARD_NAME: &'static str = "client-clipboard";
 
-    /// Start a new connection.
-    /// 원격 호스트에 접속을 시작하는 함수
-    /// peer: 접속 대상의 ID (9자리 숫자)
-    /// key: 접속 비밀번호
-    /// token: 토큰 (옵션)
-    /// conn_type: 접속 유형 (화면 공유, 파일 전송 등)
-    /// interface: UI와의 통신 인터페이스
+    /// 원격 호스트에 연결 시작
+    ///
+    /// 이 함수는 ShopRemote 클라이언트가 원격 PC에 접속할 때 호출됩니다.
+    /// 다음 과정을 수행합니다:
+    ///   1. 렌데뷰 서버에서 원격 호스트의 주소 조회
+    ///   2. 직접 연결 시도 (NAT 홀펀칭)
+    ///   3. 실패 시 릴레이 서버를 통한 중계 연결
+    ///   4. 암호화 키 교환 (RS_PUB_KEY를 이용한 Diffie-Hellman)
+    ///   5. 접속 인증 (비밀번호 확인)
+    ///   6. 화면/음성 스트림 준비
+    ///
+    /// 매개변수:
+    ///   - peer: 원격 호스트 ID (9자리 숫자, 예: "123456789")
+    ///   - key: 접속 비밀번호
+    ///   - token: 접속 토큰 (선택사항, 비밀번호 인증 대신 사용 가능)
+    ///   - conn_type: 연결 유형 (화면공유, 파일전송, 포트포워딩 등)
+    ///   - interface: UI 모듈과의 통신 인터페이스 (이벤트 콜백)
+    ///
+    /// 반환값:
+    ///   - 성공: ((Stream, 직접연결여부, 암호화키, KCP스트림, 연결타입), (연결ID, 오류정보))
+    ///   - 실패: 에러 메시지
     pub async fn start(
         peer: &str,
         key: &str,
@@ -783,17 +797,38 @@ impl Client {
         Ok((conn, direct, pk, kcp, typ))
     }
 
-    /// Establish secure connection with the server.
+    /// 원격 호스트와의 암호화 연결 구성
+    ///
+    /// 이 함수는 클라이언트와 서버 간의 안전한 통신을 위해 암호화 키를 교환합니다.
+    /// 사용되는 암호화 키:
+    ///   1. RS_PUB_KEY: ShopRemote 서버의 공개 키 (config에 하드코딩)
+    ///      - 또는 사용자가 입력한 비밀번호를 개인 키로 사용
+    ///   2. Diffie-Hellman 키 교환: 클라이언트와 원격 호스트 간 세션 키 생성
+    ///   3. Sodium Crypto Box: 메시지 암호화/복호화에 사용
+    ///
+    /// 프로토콜 흐름:
+    ///   1. 클라이언트 공개 키(pk_a) 생성
+    ///   2. 렌데뷰 서버로부터 서명된 원격 호스트 공개 키(pk_b) 수신
+    ///   3. 상호 검증: 서명 확인으로 MITM 공격 방지
+    ///   4. 세션 키(symmetric_value) 생성: pk_a와 pk_b로부터
+    ///   5. 세션 키를 클라이언트-서버 스트림에 설정
+    ///
+    /// 매개변수:
+    ///   - peer_id: 원격 호스트 ID
+    ///   - signed_id_pk: 렌데뷰 서버가 서명한 원격 호스트 공개 키
+    ///   - key: 사용자 입력 비밀번호 (비어있으면 기본 RS_PUB_KEY 사용)
+    ///   - conn: 통신용 Stream 객체
     async fn secure_connection(
         peer_id: &str,
         signed_id_pk: Vec<u8>,
         key: &str,
         conn: &mut Stream,
     ) -> ResultType<Option<Vec<u8>>> {
+        // RS_PUB_KEY 또는 사용자 비밀번호로부터 공개 키 생성
         let rs_pk = get_rs_pk(if key.is_empty() {
-            config::RS_PUB_KEY
+            config::RS_PUB_KEY  // 기본 ShopRemote 공개 키
         } else {
-            key
+            key  // 사용자가 입력한 비밀번호를 개인 키로 사용
         });
         let mut sign_pk = None;
         let mut option_pk = None;
@@ -1140,7 +1175,7 @@ impl ClientClipboardHandler {
             if let Some(urls) = check_clipboard_files(&mut self.ctx, ClipboardSide::Client, false) {
                 if !urls.is_empty() {
                     #[cfg(target_os = "macos")]
-                    if crate::clipboard::is_file_url_set_by_rustdesk(&urls) {
+                    if crate::clipboard::is_file_url_set_by_shopremote(&urls) {
                         return;
                     }
                     if self.is_file_required() {
@@ -3923,7 +3958,7 @@ async fn hc_connection_(
     mut rx: UnboundedReceiver<()>,
     token: String,
 ) -> ResultType<()> {
-    let mut timer = crate::rustdesk_interval(interval(crate::TIMER_OUT));
+    let mut timer = crate::shopremote_interval(interval(crate::TIMER_OUT));
     let mut last_recv_msg = Instant::now();
     let mut keep_alive = crate::DEFAULT_KEEP_ALIVE;
 

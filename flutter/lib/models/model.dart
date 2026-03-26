@@ -1,3 +1,41 @@
+// ============================================================================
+// ShopRemote Flutter 모델 및 상태 관리 (model.dart)
+// ============================================================================
+// 원격 세션의 모든 상태 데이터와 비즈니스 로직을 관리합니다.
+//
+// 주요 역할:
+//   1. 원격 세션 상태 관리 (FfiModel, ImageModel, CursorModel 등)
+//   2. Rust FFI 콜백 처리 및 이벤트 핸들링
+//   3. 화면 렌더링 상태 (CanvasModel, VirtualMouseMode)
+//   4. 입력 이벤트 처리 및 마우스/키보드 제어
+//   5. 화면 캡처 데이터 수신 및 처리
+//   6. 네트워크 연결 상태 모니터링
+//
+// 핵심 클래스:
+//   - FFI: 전체 원격 세션의 중심, Rust와 통신하는 브릿지
+//   - FfiModel: 세션의 기본 상태 (권한, 연결 상태, 보안 정보)
+//   - ImageModel: 수신한 화면 이미지 관리
+//   - CursorModel: 마우스 커서 위치 및 모양 관리
+//   - CanvasModel: 화면 렌더링 좌표계 및 스케일 관리
+//   - InputModel: 마우스/키보드 입력 제어
+//
+// 아키텍처 흐름:
+//   Rust (원격 컴퓨터)
+//   ↓ (화면 데이터, 마우스 위치, 이벤트)
+//   FFI (Rust ↔ Dart 브릿지)
+//   ↓
+//   Model 클래스들 (상태 저장, 비즈니스 로직)
+//   ↓
+//   ChangeNotifier.notifyListeners()
+//   ↓
+//   Widget 재구축 (UI 갱신)
+//
+// 수정 가이드:
+//   - 새 속성 추가: 해당 Model 클래스에 추가, notifyListeners() 호출
+//   - Rust 콜백 처리: handleXxxMessage() 함수 수정
+//   - UI 업데이트: ChangeNotifier를 구독한 Consumer/Selector 위젯 사용
+// ============================================================================
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
@@ -52,10 +90,37 @@ import 'package:flutter_hbb/generated_bridge.dart'
 import 'package:flutter_hbb/native/custom_cursor.dart'
     if (dart.library.html) 'package:flutter_hbb/web/custom_cursor.dart';
 
+/// 메시지 박스 처리 함수 타입
+///
+/// 용도: 원격 컴퓨터에서 보낸 메시지 박스 대화(Alert, Confirm 등) 표시
+/// 파라미터:
+///   - evt: 메시지 박스 정보 (제목, 내용, 버튼 종류 등)
+///   - id: 세션 ID (어느 원격 세션인지 식별)
 typedef HandleMsgBox = Function(Map<String, dynamic> evt, String id);
+
+/// 재연결 처리 함수 타입
+///
+/// 용도: 연결 끊김 후 자동 재연결 시도
+/// 파라미터:
+///   - OverlayDialogManager: UI 다이얼로그 표시 관리
+///   - SessionID: 세션 고유 ID
+///   - bool: 자동 재연결 여부
 typedef ReconnectHandle = Function(OverlayDialogManager, SessionID, bool);
+
+/// 세션 ID 타입 (UUID v4)
 final _constSessionId = Uuid().v4obj();
 
+/// 원격 컴퓨터 상태의 캐시된 데이터
+///
+/// 주요 캐시 항목:
+///   - peerInfo: 원격 컴퓨터의 기본 정보 (OS, CPU, 메모리 등)
+///   - permissions: 사용자의 권한 (마우스, 키보드, 클립보드 등)
+///   - cursorDataList: 마우스 커서 모양 목록
+///   - secure: 보안 연결 여부
+///   - direct: 직접 연결 여부 (vs 릴레이 연결)
+///   - streamType: 스트림 타입 (H264, VP9 등)
+///
+/// 용도: 연결 끊김 후 재연결 시 이전 상태 복원
 class CachedPeerData {
   Map<String, dynamic> updatePrivacyMode = {};
   Map<String, dynamic> peerInfo = {};
@@ -107,6 +172,30 @@ class CachedPeerData {
   }
 }
 
+/// FFI(Foreign Function Interface) 모델 - 원격 세션의 핵심 상태 관리 클래스
+///
+/// 역할:
+///   - 원격 컴퓨터의 현재 상태 관리 (연결, 권한, 정보)
+///   - Rust에서 받은 이벤트 처리
+///   - 세션 중 변경되는 상태를 캐시하여 재연결 시 복원
+///   - UI 상태 변화를 위젯에 알림 (ChangeNotifier)
+///
+/// 주요 상태 속성:
+///   - _pi (PeerInfo): 원격 컴퓨터 정보 (OS, 디스플레이, 화면 크기 등)
+///   - _permissions: 사용자 권한 (마우스, 키보드, 클립보드, 파일 전송 등)
+///   - _secure: 보안 연결 여부 (TLS/SSL)
+///   - _direct: 직접 연결 여부 (true=직접, false=릴레이 서버 경유)
+///   - _inputBlocked: 입력 이벤트 차단 여부
+///   - _viewOnly: 보기 전용 모드 여부
+///   - _showMyCursor: 내 커서 표시 여부
+///
+/// 캐시 메커니즘:
+///   - cachedPeerData: 연결 끊김 후 재연결 시 이전 상태 빠르게 복원
+///
+/// 사용 예:
+///   - 권한 확인: if (ffiModel.permissions['keyboard'] != false)
+///   - 원격 PC 정보: ffiModel.pi.platform (Android, Linux, Windows 등)
+///   - 권한 업데이트: ffiModel.updatePermission(evt, id)
 class FfiModel with ChangeNotifier {
   CachedPeerData cachedPeerData = CachedPeerData();
   PeerInfo _pi = PeerInfo();
@@ -142,6 +231,8 @@ class FfiModel with ChangeNotifier {
       _pi.tryGetDisplayIfNotAllDisplay()?.isOriginalResolution ?? false;
 
   Map<String, bool> get permissions => _permissions;
+  /// 사용자 권한 설정
+  /// 파라미터: 권한 이름(keyboard, mouse, clipboard 등) -> 여부 맵핑
   setPermissions(Map<String, bool> permissions) {
     _permissions.clear();
     _permissions.addAll(permissions);
@@ -213,6 +304,25 @@ class FfiModel with ChangeNotifier {
     }
   }
 
+  /// 원격 컴퓨터에서 받은 권한 정보 업데이트
+  ///
+  /// 역할:
+  ///   - 원격 컴퓨터 사용자가 로컬 사용자에게 부여한 권한을 업데이트
+  ///   - 키보드 권한 취소 시 마우스 상대 모드 자동 비활성화 (보안)
+  ///   - UI에 권한 변경 알림
+  ///
+  /// 파라미터:
+  ///   - evt: 권한 정보 Map (예: {keyboard: "true", mouse: "true", ...})
+  ///   - id: 세션 ID
+  ///
+  /// 예:
+  ///   {
+  ///     "keyboard": "true",      // 키보드 제어 가능
+  ///     "mouse": "true",         // 마우스 제어 가능
+  ///     "clipboard": "true",     // 클립보드 공유 가능
+  ///     "file": "true",          // 파일 전송 가능
+  ///     "audio": "true",         // 오디오 수신 가능
+  ///   }
   updatePermission(Map<String, dynamic> evt, String id) {
     // Track previous keyboard permission to detect revocation.
     final hadKeyboardPerm = _permissions['keyboard'] != false;
@@ -241,8 +351,11 @@ class FfiModel with ChangeNotifier {
     notifyListeners();
   }
 
+  /// 키보드 제어 권한이 있는지 확인
   bool get keyboard => _permissions['keyboard'] != false;
 
+  /// 세션 상태 초기화
+  /// 새 세션 시작이나 재연결 시 호출
   clear() {
     _pi = PeerInfo();
     _secure = null;
@@ -3596,43 +3709,133 @@ enum ConnType {
 }
 
 /// Flutter state manager and data communication with the Rust core.
+/// FFI (Foreign Function Interface) - Rust ↔ Dart 통신 중앙 허브
+///
+/// 역할:
+///   - 각 원격 세션의 모든 모델을 관리하는 컨테이너
+///   - Rust 네이티브 코드와 통신하는 브릿지
+///   - 세션의 생명주기 관리 (시작, 재연결, 종료)
+///   - 모든 모델에 WeakReference를 제공하여 순환 참조 방지
+///
+/// 아키텍처:
+///   Rust 바이너리 (C++)
+///   ↓ (FFI를 통한 메시지 교환)
+///   FFI.start() / FFI.close() / bind.session*()
+///   ↓
+///   각 Model 클래스 (ImageModel, FfiModel, CursorModel 등)
+///   ↓
+///   ChangeNotifier.notifyListeners()
+///   ↓
+///   Flutter UI 위젯 (Provider로 구독)
+///
+/// 세션 종류 (ConnType):
+///   - defaultConn: 일반 원격 데스크톱 제어
+///   - fileTransfer: 파일 전송만
+///   - viewCamera: 카메라 뷰만
+///   - portForward: 포트 포워딩만
+///   - terminal: 원격 터미널만
+///
+/// 모델 분류:
+///   - Session 모델: 각 연결당 별도의 인스턴스 (imageModel, ffiModel, canvasModel, inputModel 등)
+///   - Global 모델: 앱 전체에서 공유 (serverModel, abModel, groupModel, userModel 등)
 class FFI {
   var id = '';
   var version = '';
   var connType = ConnType.defaultConn;
   var closed = false;
 
-  /// dialogManager use late to ensure init after main page binding [globalKey]
+  /// 다이얼로그 관리자
+  /// late로 초기화하여 globalKey 바인딩 후 생성 (UI 컨텍스트 필요)
   late final dialogManager = OverlayDialogManager();
 
+  /// 세션 고유 ID (UUID v4)
   late final SessionID sessionId;
+
+  /// 이미지/화면 데이터 모델 (Session)
+  /// - 수신한 화면 이미지 프레임 저장
+  /// - 화면 크기, 해상도 정보 관리
   late final ImageModel imageModel; // session
+
+  /// FFI 기본 상태 모델 (Session)
+  /// - 연결 상태, 권한, 보안 정보
+  /// - 원격 컴퓨터 정보
   late final FfiModel ffiModel; // session
+
+  /// 마우스 커서 모델 (Session)
+  /// - 원격 커서 위치
+  /// - 커서 모양 (Normal, Busy, Pointer 등)
   late final CursorModel cursorModel; // session
+
+  /// 화면 렌더링 모델 (Session)
+  /// - 화면 스케일, 회전, 스크롤 오프셋
+  /// - 로컬/원격 좌표계 변환
   late final CanvasModel canvasModel; // session
+
+  /// 서버 관리 모델 (Global)
+  /// - ID 서버, 릴레이 서버 설정
+  /// - 서비스 상태 (시작/중지)
   late final ServerModel serverModel; // global
+
+  /// 채팅 모델 (Session)
   late final ChatModel chatModel; // session
+
+  /// 파일 전송 모델 (Session)
   late final FileModel fileModel; // session
+
+  /// 주소록 모델 (Global)
   late final AbModel abModel; // global
+
+  /// 그룹 모델 (Global)
   late final GroupModel groupModel; // global
+
+  /// 사용자 로그인 모델 (Global)
   late final UserModel userModel; // global
+
+  /// 피어 탭 모델 (Global)
   late final PeerTabModel peerTabModel; // global
+
+  /// 네트워크 품질 모니터 모델 (Session)
+  /// - FPS, 딜레이, 비트레이트 등 모니터링
   late final QualityMonitorModel qualityMonitorModel; // session
+
+  /// 화면 녹화 모델 (Session)
   late final RecordingModel recordingModel; // session
+
+  /// 입력 제어 모델 (Session)
+  /// - 마우스/키보드 제어
+  /// - 상대 마우스 모드
   late final InputModel inputModel; // session
+
+  /// 승격 모델 (Session)
   late final ElevationModel elevationModel; // session
+
+  /// 연결 관리자 파일 모델 (CM)
   late final CmFileModel cmFileModel; // cm
+
+  /// 텍스처 렌더링 모델 (Session)
   late final TextureModel textureModel; //session
+
+  /// 최근 연결 피어 모델 (Global)
   late final Peers recentPeersModel; // global
+
+  /// 즐겨찾기 피어 모델 (Global)
   late final Peers favoritePeersModel; // global
+
+  /// LAN 내 피어 모델 (Global)
   late final Peers lanPeersModel; // global
 
-  // Terminal model registry for multiple terminals
+  /// 원격 터미널 모델 레지스트리 (Session)
+  /// 여러 터미널 탭을 지원하기 위해 ID별로 저장
   final Map<int, TerminalModel> _terminalModels = {};
 
-  // Getter for terminal models
   Map<int, TerminalModel> get terminalModels => _terminalModels;
 
+  /// FFI 초기화
+  ///
+  /// 파라미터:
+  ///   - sId: 세션 ID (생략하면 자동 생성)
+  ///           데스크톱: 매번 새 UUID 생성
+  ///           모바일: 전역 세션 ID 재사용 (성능 최적화)
   FFI(SessionID? sId) {
     sessionId = sId ?? (isDesktop ? Uuid().v4obj() : _constSessionId);
     imageModel = ImageModel(WeakReference(this));
@@ -3673,7 +3876,32 @@ class FFI {
     ffiModel.waitForImageTimer = null;
   }
 
-  /// Start with the given [id]. Only transfer file if [isFileTransfer], only view camera if [isViewCamera], only port forward if [isPortForward].
+  /// 원격 세션 시작
+  ///
+  /// 역할:
+  ///   - 지정된 원격 컴퓨터로 연결 시작
+  ///   - 연결 타입 결정 (일반 제어, 파일 전송, 카메라 뷰 등)
+  ///   - Rust 바이너리에 연결 요청 전송
+  ///   - 화면 수신, 입력 제어 준비
+  ///
+  /// 파라미터:
+  ///   - id: 원격 컴퓨터의 ShopRemote ID (숫자 문자열, 예: "123456789")
+  ///   - isFileTransfer: true면 파일 전송만 활성화
+  ///   - isViewCamera: true면 카메라 뷰만 활성화
+  ///   - isPortForward: true면 포트 포워딩만 활성화
+  ///   - isTerminal: true면 원격 터미널만 활성화
+  ///   - password: 비밀번호 기반 인증용 비밀번호
+  ///   - isSharedPassword: true면 공유 비밀번호 사용
+  ///   - connToken: 토큰 기반 인증용 토큰
+  ///   - forceRelay: true면 강제로 릴레이 서버 경유
+  ///   - tabWindowId: 탭으로 열기 시 부모 탭 ID (별도 윈도우 아님)
+  ///   - display: 보려는 원격 화면 인덱스 (다중 모니터)
+  ///   - displays: 사용 가능한 원격 화면 목록
+  ///
+  /// 사용 예:
+  ///   ffi.start("123456789", password: "1234");  // 일반 원격 제어
+  ///   ffi.start("123456789", isFileTransfer: true);  // 파일 전송만
+  ///   ffi.start("123456789", isTerminal: true);  // 원격 터미널
   void start(
     String id, {
     bool isFileTransfer = false,
@@ -4067,7 +4295,7 @@ class PeerInfo with ChangeNotifier {
   bool get cursorEmbedded => tryGetDisplay()?.cursorEmbedded ?? false;
 
   bool get isShopRemoteIdd =>
-      platformAdditions[kPlatformAdditionsIddImpl] == 'rustdesk_idd';
+      platformAdditions[kPlatformAdditionsIddImpl] == 'shopremote_idd';
   bool get isAmyuniIdd =>
       platformAdditions[kPlatformAdditionsIddImpl] == 'amyuni_idd';
 

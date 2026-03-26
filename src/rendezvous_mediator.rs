@@ -76,16 +76,29 @@ pub struct RendezvousMediator {
 }
 
 impl RendezvousMediator {
-    // 렌데부 서버 연결을 재시작하는 함수
+    /// 렌데뷰 서버 연결 재시작
+    ///
+    /// 현재 렌데뷰 서버 연결을 끊고 새로 시작합니다.
+    /// 설정 변경 후 새로운 서버에 연결할 때 호출됩니다.
     pub fn restart() {
-        SHOULD_EXIT.store(true, Ordering::SeqCst);
-        MANUAL_RESTARTED.store(true, Ordering::SeqCst);
+        SHOULD_EXIT.store(true, Ordering::SeqCst);  // 현재 루프 종료 신호
+        MANUAL_RESTARTED.store(true, Ordering::SeqCst);  // 수동 재시작 표시
         log::info!("server restart");
     }
 
-    // 렌데부 서버와의 연결 메인 루프
-    // NAT 타입 테스트, 직접 연결 서버 시작, 음파 수신 시작
-    // 무한 루프로 계속 실행되며, 연결 실패 시 재접속 시도
+    /// 렌데뷰 서버 연결 및 통신 시작
+    ///
+    /// 프로그램 시작 후 백그라운드에서 계속 실행되는 메인 루프입니다.
+    /// 이 함수는 다음을 수행합니다:
+    ///   1. NAT 타입 감지 (UPnP, STUN 등으로 홀펀칭 가능 여부 판단)
+    ///   2. 직접 연결 서버(hbrrh) 시작 - P2P 직접 연결용
+    ///   3. 렌데뷰 서버(ai.ilv.co.kr)에 UDP로 접속
+    ///   4. 주기적으로 자신의 ID와 NAT 정보를 렌데뷰 서버에 등록
+    ///   5. 음파(heart beat) 응답 - 렌데뷰 서버 활성 상태 확인
+    ///   6. 원격 접속 요청 수신 및 처리
+    ///
+    /// 연결이 끊어지면 자동으로 재접속을 시도합니다 (지수 백오프).
+    /// 프로그램 종료 전까지 무한 루프로 실행됩니다.
     pub async fn start_all() {
         crate::test_nat_type();
         if config::is_outgoing_only() {
@@ -183,6 +196,25 @@ impl RendezvousMediator {
             .unwrap_or(host.to_owned())
     }
 
+    /// 렌데뷰 서버와의 UDP 연결 시작
+    ///
+    /// 렌데뷰 서버(ai.ilv.co.kr:21116)에 UDP로 접속하고,
+    /// 주기적으로 자신의 ID를 등록하며 음파(heartbeat)를 처리합니다.
+    ///
+    /// UDP 통신의 장점:
+    ///   - TCP보다 빠른 응답 시간
+    ///   - NAT 홀펀칭에 유리 (상태 기반 방화벽도 UDP 통로 유지)
+    ///   - 간단한 요청-응답 프로토콜에 적합
+    ///
+    /// 주기적 등록 메커니즘:
+    ///   - 초기: 3초 주기로 ID 등록 시도 (MIN_REG_TIMEOUT = 3000ms)
+    ///   - 실패 시: 지수 백오프로 최대 30초까지 증가 (MAX_REG_TIMEOUT = 30000ms)
+    ///   - 성공 시: 60초 주기로 keep-alive 전송 (REG_INTERVAL = 60000ms)
+    ///
+    /// 실패 처리:
+    ///   - 2회 실패: 지연 증가 시작
+    ///   - 4회 실패: DNS 재확인 및 UDP 소켓 재바인딩
+    ///   - 네트워크 재연결 후 소켓 재생성으로 안정성 향상
     pub async fn start_udp(server: ServerPtr, host: String) -> ResultType<()> {
         let host = check_port(&host, RENDEZVOUS_PORT);
         log::info!("start udp: {host}");
@@ -208,10 +240,16 @@ impl RendezvousMediator {
         let mut old_latency = 0;
         let mut ema_latency = 0;
         loop {
+            // 렌데뷰 서버 응답 확인 및 지연시간 업데이트
+            // 클로저: 렌데뷰 서버로부터 응답을 받았을 때 호출
             let mut update_latency = || {
+                // 응답 수신 시간 갱신
                 last_register_resp = Some(Instant::now());
+                // 실패 카운터 초기화
                 fails = 0;
+                // 재시도 타임아웃을 최소값으로 리셋
                 reg_timeout = MIN_REG_TIMEOUT;
+                // 마지막 요청 전송 시점부터 경과 시간 계산 (마이크로초)
                 let mut latency = last_register_sent
                     .map(|x| x.elapsed().as_micros() as i64)
                     .unwrap_or(0);
@@ -598,18 +636,40 @@ impl RendezvousMediator {
         Ok(())
     }
 
+    /// NAT 홀펀칭 처리
+    ///
+    /// 클라이언트 또는 다른 원격 호스트가 이 호스트에 접속하려고 할 때 호출됩니다.
+    /// 렌데뷰 서버가 상대방의 주소 정보(PunchHole)를 전달합니다.
+    ///
+    /// NAT 홀펀칭 메커니즘:
+    ///   1. 클라이언트 → 렌데뷰 서버: "123456789(상대방 ID)에 접속하고 싶습니다"
+    ///   2. 렌데뷰 서버 → 원격 호스트: "PunchHole 메시지" (클라이언트 주소 포함)
+    ///   3. 원격 호스트: 클라이언트 주소로 먼저 메시지 전송 (방화벽 통로 열기)
+    ///   4. 클라이언트: 동시에 원격 호스트로 메시지 전송
+    ///   5. 결과: P2P 직접 연결 성립
+    ///
+    /// 릴레이 서버 폴백:
+    ///   - SYMMETRIC NAT인 경우: 홀펀칭 실패 가능성 높음 → 릴레이 사용
+    ///   - WebSocket(ws://) 사용 중: 릴레이 사용 (방화벽 우회)
+    ///   - TCP 수신 비활성화 + UDP 미지원: 릴레이 필수
+    ///
+    /// IPv6 지원:
+    ///   - IPv6 주소 사용 가능 시 동시에 IPv6 연결 시도
+    ///   - 클라이언트가 IPv6/IPv4 중 더 빠른 경로 선택 가능
     async fn handle_punch_hole(&self, ph: PunchHole, server: ServerPtr) -> ResultType<()> {
         let mut peer_addr = AddrMangle::decode(&ph.socket_addr);
         let last = *LAST_MSG.lock().await;
         *LAST_MSG.lock().await = (peer_addr, Instant::now());
-        // skip duplicate punch hole messages
+        // 100ms 이내 중복 메시지 무시 (렌데뷰 서버 재전송 대비)
         if last.0 == peer_addr && last.1.elapsed().as_millis() < 100 {
             return Ok(());
         }
         let peer_addr_v6 = hbb_common::AddrMangle::decode(&ph.socket_addr_v6);
+        // WebSocket, Proxy, 또는 강제 릴레이 플래그 확인
         let relay = use_ws() || Config::is_proxy() || ph.force_relay;
         let mut socket_addr_v6 = Default::default();
         let control_permissions = ph.control_permissions.into_option();
+        // IPv6 주소가 있고 릴레이 미사용 시 IPv6 연결도 준비
         if peer_addr_v6.port() > 0 && !relay {
             socket_addr_v6 = start_ipv6(
                 peer_addr_v6,
@@ -620,7 +680,7 @@ impl RendezvousMediator {
             .await;
         }
         let relay_server = self.get_relay_server(ph.relay_server);
-        // for ensure, websocket go relay directly
+        // SYMMETRIC NAT이거나 기타 조건에서는 직접 연결 불가 → 릴레이 서버 사용
         if ph.nat_type.enum_value() == Ok(NatType::SYMMETRIC)
             || Config::get_nat_type() == NatType::SYMMETRIC as i32
             || relay
@@ -675,6 +735,17 @@ impl RendezvousMediator {
         Ok(())
     }
 
+    /// UDP 홀펀칭 수행
+    ///
+    /// UDP 기반 NAT 홀펀칭을 시도합니다.
+    /// TCP 홀펀칭보다 더 효과적이며, 게이밍이나 음성 통화에 필요합니다.
+    ///
+    /// 동작:
+    ///   1. 렌데뷰 서버의 릴레이 주소로 "PunchHoleSent" 메시지 전송
+    ///   2. 처음부터 클라이언트로 연결 시도 (방화벽 통로 열기)
+    ///   3. 10-30ms 간격으로 3번 재시도 (패킷 손실 대비)
+    ///   4. 클라이언트도 동시에 이 호스트로 패킷 전송
+    ///   5. 양방향 경로 확보 → P2P UDP 연결 성립
     async fn punch_udp_hole(
         &self,
         peer_addr: SocketAddr,
@@ -684,15 +755,18 @@ impl RendezvousMediator {
     ) -> ResultType<()> {
         let mut msg_out = Message::new();
         msg_out.set_punch_hole_sent(msg_punch);
+        // 렌데뷰 서버의 릴레이 주소로 UDP 소켓 생성
         let (socket, addr) = new_direct_udp_for(&self.host).await?;
         let data = msg_out.write_to_bytes()?;
+        // 렌데뷰 서버 릴레이에 메시지 전송 → 클라이언트에 전달
         socket.send_to(&data, addr).await?;
         let socket_cloned = socket.clone();
+        // 비동기 재시도 스레드: 10-30ms 간격으로 2번 더 전송
         tokio::spawn(async move {
             for _ in 0..2 {
                 let tm = (hbb_common::time_based_rand() % 20 + 10) as f32 / 1000.;
                 hbb_common::sleep(tm).await;
-                socket.send_to(&data, addr).await.ok();
+                socket.send_to(&data, addr).await.ok();  // 재전송 (실패해도 무시)
             }
         });
         udp_nat_listen(

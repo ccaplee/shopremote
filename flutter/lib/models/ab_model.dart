@@ -946,7 +946,8 @@ class LegacyAb extends BaseAb {
 
   @override
   bool isFull() {
-    return licensedDevices > 0 && peers.length >= licensedDevices;
+    // ShopRemote: 기기 수 제한 비활성화 - 자체 서버에서는 제한 없음
+    return false; // Disable device limit check
   }
 
   @override

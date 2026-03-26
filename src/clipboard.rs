@@ -76,14 +76,14 @@ pub fn check_clipboard(
 }
 
 #[cfg(all(feature = "unix-file-copy-paste", target_os = "macos"))]
-pub fn is_file_url_set_by_rustdesk(url: &Vec<String>) -> bool {
+pub fn is_file_url_set_by_shopremote(url: &Vec<String>) -> bool {
     if url.len() != 1 {
         return false;
     }
     url.iter()
         .next()
         .map(|s| {
-            for prefix in &["file:///tmp/.rustdesk_", "//tmp/.rustdesk_"] {
+            for prefix in &["file:///tmp/.shopremote_", "//tmp/.shopremote_"] {
                 if s.starts_with(prefix) {
                     return s[prefix.len()..].parse::<uuid::Uuid>().is_ok();
                 }
@@ -383,13 +383,13 @@ impl ClipboardContext {
     }
 
     #[cfg(all(feature = "unix-file-copy-paste", target_os = "macos"))]
-    fn get_file_urls_set_by_rustdesk(
+    fn get_file_urls_set_by_shopremote(
         data: Vec<ClipboardData>,
         _side: ClipboardSide,
     ) -> Vec<String> {
         for item in data.into_iter() {
             if let ClipboardData::FileUrl(urls) = item {
-                if is_file_url_set_by_rustdesk(&urls) {
+                if is_file_url_set_by_shopremote(&urls) {
                     return urls;
                 }
             }
@@ -398,7 +398,7 @@ impl ClipboardContext {
     }
 
     #[cfg(all(feature = "unix-file-copy-paste", target_os = "linux"))]
-    fn get_file_urls_set_by_rustdesk(data: Vec<ClipboardData>, side: ClipboardSide) -> Vec<String> {
+    fn get_file_urls_set_by_shopremote(data: Vec<ClipboardData>, side: ClipboardSide) -> Vec<String> {
         let exclude_path =
             clipboard::platform::unix::fuse::get_exclude_paths(side == ClipboardSide::Client);
         data.into_iter()
@@ -418,7 +418,7 @@ impl ClipboardContext {
     fn try_empty_clipboard_files(&mut self, side: ClipboardSide) {
         let _lock = ARBOARD_MTX.lock().unwrap();
         if let Ok(data) = self.get_formats(&[ClipboardFormat::FileUrl]) {
-            let urls = Self::get_file_urls_set_by_rustdesk(data, side);
+            let urls = Self::get_file_urls_set_by_shopremote(data, side);
             if !urls.is_empty() {
                 // FIXME:
                 // The host-side clear file clipboard `let _ = self.inner.clear();`,

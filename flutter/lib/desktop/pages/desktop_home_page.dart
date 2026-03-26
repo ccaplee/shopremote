@@ -1,3 +1,28 @@
+// ============================================================================
+// ShopRemote 데스크톱 홈페이지 (desktop_home_page.dart)
+// ============================================================================
+// 메인 원격 접속 UI의 홈 화면입니다.
+//
+// 주요 역할:
+//   1. 앱의 메인 홈 화면을 제공합니다
+//   2. 왼쪽 패널: ID 표시, 비밀번호 표시, 도움말 카드
+//   3. 오른쪽 패널: 원격 접속 연결 입력 및 서버 상태 표시
+//   4. 연결된 피어 목록 및 주소록 표시
+//   5. 서비스 상태 모니터링 (활성화/비활성화)
+//
+// UI 구조:
+//   - buildLeftPane(): 왼쪽 패널 (ID, 비밀번호, 도움말)
+//   - buildRightPane(): 오른쪽 패널 (연결 페이지)
+//   - buildIDBoard(): ID 표시 영역
+//   - buildPasswordBoard(): 비밀번호 표시 영역
+//   - buildHelpCards(): 도움말 카드
+//
+// 수정 가이드:
+//   - ID/비밀번호 표시 변경: buildIDBoard/buildPasswordBoard 수정
+//   - 좌우 패널 레이아웃 변경: Row 위젯의 children 수정
+//   - 새 정보 추가: buildLeftPane 또는 buildRightPane 확장
+// ============================================================================
+
 import 'dart:async';
 import 'dart:io';
 import 'dart:convert';
@@ -26,6 +51,8 @@ import 'package:window_manager/window_manager.dart';
 import 'package:window_size/window_size.dart' as window_size;
 import '../widgets/button.dart';
 
+/// 데스크톱 홈 페이지 위젯
+/// 상태를 유지하며 언제나 메모리에 유지되는 StatefulWidget입니다.
 class DesktopHomePage extends StatefulWidget {
   const DesktopHomePage({Key? key}) : super(key: key);
 
@@ -35,6 +62,13 @@ class DesktopHomePage extends StatefulWidget {
 
 const borderColor = Color(0xFF2F65BA);
 
+/// 데스크톱 홈 페이지 상태 클래스
+///
+/// 주요 기능:
+///   - wantKeepAlive: true로 설정하여 탭 전환 시에도 상태 유지
+///   - AutomaticKeepAliveClientMixin: 위젯이 스크롤 밖으로 나가도 상태 보존
+///   - WidgetsBindingObserver: 애플리케이션 라이프사이클 감시
+///   - 서비스 상태, 권한, 시스템 권한 모니터링
 class _DesktopHomePageState extends State<DesktopHomePage>
     with AutomaticKeepAliveClientMixin, WidgetsBindingObserver {
   final _leftPaneScrollController = ScrollController();
@@ -71,11 +105,21 @@ class _DesktopHomePageState extends State<DesktopHomePage>
     ));
   }
 
+  /// 레이아웃을 보안 차단으로 감싸는 헬퍼 함수
+  /// 원격 제어 권한이 없을 때 UI를 마스크 처리합니다.
   Widget _buildBlock({required Widget child}) {
     return buildRemoteBlock(
         block: _block, mask: true, use: canBeBlocked, child: child);
   }
 
+  /// 왼쪽 패널을 구성하는 함수
+  ///
+  /// 표시 내용:
+  ///   - 앱 로고 (커스텀 클라이언트인 경우 "Powered by" 텍스트)
+  ///   - 이 컴퓨터의 ID 및 비밀번호 표시
+  ///   - 도움말 카드 (업데이트 정보 포함)
+  ///   - 서비스 상태 표시 (수신 전용 모드)
+  ///   - 설정 버튼 (발신 전용 모드)
   Widget buildLeftPane(BuildContext context) {
     final isIncomingOnly = bind.isIncomingOnly();
     final isOutgoingOnly = bind.isOutgoingOnly();
@@ -180,6 +224,12 @@ class _DesktopHomePageState extends State<DesktopHomePage>
     );
   }
 
+  /// 오른쪽 패널을 구성하는 함수
+  ///
+  /// ConnectionPage 위젯을 표시하여 다음 기능을 제공합니다:
+  ///   - 원격 접속 ID 입력 필드
+  ///   - 접속 버튼
+  ///   - 최근 연결 기록
   buildRightPane(BuildContext context) {
     return Container(
       color: Theme.of(context).scaffoldBackgroundColor,
@@ -187,6 +237,12 @@ class _DesktopHomePageState extends State<DesktopHomePage>
     );
   }
 
+  /// ID 표시 영역을 구성하는 함수
+  ///
+  /// 이 컴퓨터의 ID와 ID 복사 버튼을 표시합니다:
+  ///   - ServerModel에서 현재 ID 조회
+  ///   - ID를 클립보드로 복사 기능
+  ///   - 클릭 가능한 ID 필드
   buildIDBoard(BuildContext context) {
     final model = gFFI.serverModel;
     return Container(
@@ -430,6 +486,8 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   }
 
   Widget buildHelpCards(String updateUrl) {
+    // ShopRemote: 자동 업데이트 알림 비활성화 - 자체 서버 사용으로 불필요
+    /*
     if (!bind.isCustomClient() &&
         updateUrl.isNotEmpty &&
         !isCardClosed &&
@@ -453,9 +511,10 @@ class _DesktopHomePageState extends State<DesktopHomePage>
           closeButton: true,
           help: isToUpdate ? 'Changelog' : null,
           link: isToUpdate
-              ? 'https://github.com/rustdesk/rustdesk/releases/tag/${bind.mainGetNewVersion()}'
+              ? 'https://github.com/ccaplee/shopremote/releases/tag/${bind.mainGetNewVersion()}'
               : null);
     }
+    */
     if (systemError.isNotEmpty) {
       return buildInstallCard("", systemError, "", () {});
     }
@@ -468,7 +527,10 @@ class _DesktopHomePageState extends State<DesktopHomePage>
           await rustDeskWinManager.closeAllSubWindows();
           bind.mainGotoInstall();
         });
-      } else if (bind.mainIsInstalledLowerVersion()) {
+      }
+      // ShopRemote: 자동 업데이트 알림 비활성화 - 자체 서버 사용으로 불필요
+      /*
+      else if (bind.mainIsInstalledLowerVersion()) {
         return buildInstallCard(
             "Status", "Your installation is lower version.", "Click to upgrade",
             () async {
@@ -476,6 +538,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
           bind.mainUpdateMe();
         });
       }
+      */
     } else if (isMacOS) {
       final isOutgoingOnly = bind.isOutgoingOnly();
       if (!(isOutgoingOnly || bind.mainIsCanScreenRecording(prompt: false))) {

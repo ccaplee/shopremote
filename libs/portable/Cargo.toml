@@ -1,5 +1,5 @@
 [package]
-name = "rustdesk-portable-packer"
+name = "shopremote-portable-packer"
 version = "1.4.6"
 edition = "2021"
 description = "ShopRemote Remote Desktop"
@@ -28,7 +28,7 @@ native-windows-gui = {version = "1.0", default-features = false, features = ["an
 [package.metadata.winres]
 LegalCopyright = "Copyright © 2025 ShopRemote. All rights reserved."
 ProductName = "ShopRemote"
-OriginalFilename = "rustdesk.exe"
+OriginalFilename = "shopremote.exe"
 FileDescription = "ShopRemote Remote Desktop"
 #ProductVersion = ""
 

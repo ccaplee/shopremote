@@ -186,7 +186,8 @@ class GroupModel {
               json['error']
                   .toString()
                   .contains('ambiguous column name: status')) {
-            throw translate('upgrade_rustdesk_server_pro_to_{1.1.10}_tip');
+            // ShopRemote: 서버 업그레이드 메시지 비활성화 - 자체 서버에서 구성됨
+            throw 'Server requires admin access. Please check the server configuration.';
           } else {
             throw json['error'];
           }

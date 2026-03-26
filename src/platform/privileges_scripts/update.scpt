@@ -1,7 +1,7 @@
 on run {daemon_file, agent_file, user, cur_pid, source_dir}
 
-  set agent_plist to "/Library/LaunchAgents/com.carriez.ShopRemote_server.plist"
-  set daemon_plist to "/Library/LaunchDaemons/com.carriez.ShopRemote_service.plist"
+  set agent_plist to "/Library/LaunchAgents/kr.co.ilv.shopremote_server.plist"
+  set daemon_plist to "/Library/LaunchDaemons/kr.co.ilv.shopremote_service.plist"
   set app_bundle to "/Applications/ShopRemote.app"
 
   set check_source to "test -d " & quoted form of source_dir & " || exit 1;"

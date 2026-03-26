@@ -2875,12 +2875,46 @@ bool get kUseCompatibleUiMode =>
 
 bool get isWin10 => windowsBuildNumber.windowsVersion == WindowsTarget.w10;
 
+/// 서버 연결 설정 클래스
+///
+/// ShopRemote 앱에서 원격 접속 시 사용할 서버 정보를 관리합니다.
+///
+/// 주요 속성:
+///   - idServer: ID 서버 주소 (기본값: ai.ilv.co.kr)
+///     목적: 피어(peer) ID를 등록하고 조회하는 서버
+///     역할: 사용자의 고유 ID를 중앙에서 관리
+///
+///   - relayServer: 릴레이 서버 주소 (기본값: ai.ilv.co.kr)
+///     목적: 직접 연결 실패 시 중계하는 서버
+///     역할: 방화벽, NAT 뒤의 컴퓨터들 간 통신 중계
+///
+///   - apiServer: API 서버 주소 (기본값: 빈 문자열)
+///     목적: REST API 호출용 (필요시만 사용)
+///     역할: 추가 서비스 API 제공
+///
+///   - key: 서버 인증 키 (기본값: r8Mxm2lf9f5l9MGHufGp7aPiMEHcygeCPhcdps30b5w=)
+///     목적: 서버 통신의 암호화 및 인증
+///     역할: 보안 통신 보장
+///
+/// 설정 우선순위 (높은 순):
+///   1. 사용자가 설정 > 네트워크에서 수정한 값
+///   2. 프로그램에 하드코딩된 기본값 (ai.ilv.co.kr)
+///   3. 서버 생성 JSON 파일의 값
 class ServerConfig {
   late String idServer;
   late String relayServer;
   late String apiServer;
   late String key;
 
+  /// 기본 생성자
+  ///
+  /// 파라미터:
+  ///   - idServer: 아이디 서버 주소
+  ///   - relayServer: 릴레이 서버 주소
+  ///   - apiServer: API 서버 주소
+  ///   - key: 암호화 키
+  ///
+  /// 모든 파라미터는 선택사항이며, 양쪽 끝의 공백은 자동으로 제거됩니다.
   ServerConfig(
       {String? idServer, String? relayServer, String? apiServer, String? key}) {
     this.idServer = idServer?.trim() ?? '';
@@ -2889,9 +2923,19 @@ class ServerConfig {
     this.key = key?.trim() ?? '';
   }
 
-  /// decode from shared string (from user shared or shopremote-server generated)
-  /// also see [encode]
-  /// throw when decoding failure
+  /// 공유된 설정 문자열을 디코딩하여 ServerConfig 객체 생성
+  ///
+  /// 지원하는 형식:
+  ///   1. JSON 형식: {"host": "...", "relay": "...", "api": "...", "key": "..."}
+  ///   2. Base64 역순 형식 (호환성): 이전 버전과의 호환성을 위함
+  ///
+  /// 사용 예:
+  ///   - 사용자가 공유받은 설정 문자열 디코딩
+  ///   - QR 코드, URL 파라미터에서 받은 설정 디코딩
+  ///
+  /// 예외: 디코딩 실패 시 예외 발생
+  ///
+  /// 참고: [encode] 메서드와 쌍을 이룹니다.
   ServerConfig.decode(String msg) {
     var json = {};
     try {
@@ -2908,8 +2952,19 @@ class ServerConfig {
     key = json['key'] ?? '';
   }
 
-  /// encode to shared string
-  /// also see [ServerConfig.decode]
+  /// 설정을 공유 가능한 문자열로 인코딩
+  ///
+  /// JSON 형식으로 설정을 변환한 후 Base64 역순으로 인코딩합니다.
+  /// 이렇게 인코딩된 문자열은 다른 사용자와 공유할 수 있습니다.
+  ///
+  /// 반환값:
+  ///   - 공유용 암호화된 문자열 (QR 코드나 URL 파라미터에 사용 가능)
+  ///
+  /// 사용 예:
+  ///   String shared = config.encode();
+  ///   // 다른 기기에서: ServerConfig.decode(shared);
+  ///
+  /// 참고: [ServerConfig.decode] 메서드와 쌍을 이룹니다.
   String encode() {
     Map<String, String> config = {};
     config['host'] = idServer.trim();
@@ -2922,12 +2977,24 @@ class ServerConfig {
         .join();
   }
 
-  /// from local options
-  // [ShopRemote] 기본 서버 설정
-  // ID 서버와 릴레이 서버의 기본값을 자체 서버(ai.ilv.co.kr)로 지정
-  // 사용자가 설정 > 네트워크에서 언제든 변경 가능
-  // 서버 변경 시 Public Key도 함께 업데이트 필요
-  // Public Key: r8Mxm2lf9f5l9MGHufGp7aPiMEHcygeCPhcdps30b5w=
+  /// 로컬 설정 옵션에서 ServerConfig 생성
+  ///
+  /// 사용자가 설정 > 네트워크에서 변경한 값을 읽어서 ServerConfig를 생성합니다.
+  /// 설정이 없으면 기본값을 사용합니다.
+  ///
+  /// 주요 포인트:
+  ///   1. ID 서버와 릴레이 서버의 기본값: ai.ilv.co.kr (ShopRemote 자체 서버)
+  ///   2. 사용자는 설정에서 언제든 변경 가능
+  ///   3. 서버 변경 시 Public Key도 함께 업데이트 필요
+  ///
+  /// 파라미터:
+  ///   - options: 설정 저장소에서 읽은 Map (bind.mainGetBuildinOption() 결과)
+  ///
+  /// 설정 키:
+  ///   - 'custom-rendezvous-server': ID 서버 (기본: ai.ilv.co.kr)
+  ///   - 'relay-server': 릴레이 서버 (기본: ai.ilv.co.kr)
+  ///   - 'api-server': API 서버 (기본: 빈 문자열)
+  ///   - 'key': 암호화 키 (기본: r8Mxm2lf9f5l9MGHufGp7aPiMEHcygeCPhcdps30b5w=)
   ServerConfig.fromOptions(Map<String, dynamic> options)
       : idServer = options['custom-rendezvous-server'] ?? "ai.ilv.co.kr",
         relayServer = options['relay-server'] ?? "ai.ilv.co.kr",
