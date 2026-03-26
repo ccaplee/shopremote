@@ -1,3 +1,27 @@
+// ============================================================================
+// ShopRemote 서버 연결 관리 (connection.rs)
+// ============================================================================
+// 원격 데스크톱 "접속을 받는 쪽"의 핵심 로직을 담당합니다.
+// 여기서 "서버"란 릴레이 서버가 아니라, 원격 제어를 허용하는 PC를 말합니다.
+//
+// 주요 역할:
+//   1. 화면 캡처 (Screen Capture) 및 인코딩
+//   2. 마우스/키보드 입력 이벤트 수신 및 시뮬레이션
+//   3. 접속 인증 (비밀번호 확인)
+//   4. 다중 클라이언트 동시 접속 관리
+//   5. 클립보드 동기화 (양방향)
+//   6. 파일 전송 요청 처리
+//
+// 주요 구조체:
+//   - Connection: 개별 클라이언트 연결을 담당
+//   - LoginFailures: 로그인 실패 추적 (보안)
+//
+// 수정 가이드:
+//   - 화면 캡처 방식 변경: video_service 관련 함수 수정
+//   - 접속 제한/필터링: start 함수에서 IP 체크 추가
+//   - 새 인증 방식: handle_login 함수 수정
+// ============================================================================
+
 use super::{input_service::*, *};
 #[cfg(feature = "unix-file-copy-paste")]
 use crate::clipboard::try_empty_clipboard_files;
@@ -211,8 +235,8 @@ pub struct Connection {
     server: super::ServerPtrWeak,
     hash: Hash,
     read_jobs: Vec<fs::TransferJob>,
-    timer: crate::RustDeskInterval,
-    file_timer: crate::RustDeskInterval,
+    timer: crate::ShopRemoteInterval,
+    file_timer: crate::ShopRemoteInterval,
     file_transfer: Option<(String, bool)>,
     view_camera: bool,
     terminal: bool,
@@ -347,6 +371,12 @@ const SEND_TIMEOUT_OTHER: u64 = SEND_TIMEOUT_VIDEO * 10;
 const SESSION_TIMEOUT: Duration = Duration::from_secs(30);
 
 impl Connection {
+    /// 원격 클라이언트 연결 처리 시작
+    /// addr: 클라이언트의 네트워크 주소
+    /// stream: TCP/UDP 스트림
+    /// id: 연결 ID (각 클라이언트마다 고유)
+    /// server: 메인 서버 참조
+    /// control_permissions: 원격 제어 권한 (화면공유만 가능 등)
     pub async fn start(
         addr: SocketAddr,
         stream: super::Stream,
@@ -4668,7 +4698,7 @@ impl Connection {
     #[cfg(all(target_os = "windows", feature = "flutter"))]
     async fn send_printer_request(&mut self, data: Vec<u8>) {
         // This path is only used to identify the printer job.
-        let path = format!("RustDesk://FsJob//Printer/{}", get_time());
+        let path = format!("ShopRemote://FsJob//Printer/{}", get_time());
 
         let msg = fs::new_send(0, fs::JobType::Printer, path.clone(), 1, false);
         self.send(msg).await;

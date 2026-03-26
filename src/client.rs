@@ -1,3 +1,26 @@
+// ============================================================================
+// ShopRemote 클라이언트 모듈 (client.rs)
+// ============================================================================
+// 원격 데스크톱 "접속하는 쪽"의 핵심 로직을 담당합니다.
+//
+// 주요 역할:
+//   1. 원격 호스트에 TCP/UDP 연결 수립
+//   2. 화면 데이터(프레임) 수신 및 디코딩
+//   3. 마우스/키보드 입력 이벤트를 원격 호스트로 전송
+//   4. 클립보드 동기화
+//   5. 파일 전송 세션 관리
+//   6. 오디오 스트림 수신 (원격 소리 전달)
+//
+// 주요 구조체:
+//   - Client: 원격 접속 세션의 메인 핸들러
+//   - LoginConfigHandler: 접속 인증 설정 관리
+//
+// 수정 가이드:
+//   - 화면 품질 조정: codec 관련 설정 수정
+//   - 새 입력 장치 지원: handle_input 함수 확장
+//   - 접속 인증 방식 변경: handle_login 함수 수정
+// ============================================================================
+
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 use crate::clipboard::clipboard_listener;
 use async_trait::async_trait;
@@ -188,6 +211,12 @@ impl Client {
     const CLIENT_CLIPBOARD_NAME: &'static str = "client-clipboard";
 
     /// Start a new connection.
+    /// 원격 호스트에 접속을 시작하는 함수
+    /// peer: 접속 대상의 ID (9자리 숫자)
+    /// key: 접속 비밀번호
+    /// token: 토큰 (옵션)
+    /// conn_type: 접속 유형 (화면 공유, 파일 전송 등)
+    /// interface: UI와의 통신 인터페이스
     pub async fn start(
         peer: &str,
         key: &str,

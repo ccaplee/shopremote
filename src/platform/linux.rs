@@ -1,3 +1,21 @@
+// ============================================================================
+// ShopRemote Linux 플랫폼 모듈
+// ============================================================================
+// Linux 운영체제에 특화된 기능을 구현합니다.
+//
+// 주요 기능:
+//   - 화면 캡처: X11(XGetImage) 또는 Wayland(PipeWire) 사용
+//   - 입력 시뮬레이션: X11(XTest) 또는 uinput 사용
+//   - systemd 서비스 등록
+//   - PulseAudio/PipeWire 오디오 캡처
+//   - D-Bus를 통한 데스크톱 알림
+//   - Wayland 환경 감지 및 대응
+//
+// 수정 가이드:
+//   - 서비스 이름: "shopremote" (systemd 서비스)
+//   - 새 Linux 기능 추가 시 이 파일에 구현
+// ============================================================================
+
 use super::{gtk_sudo, CursorData, ResultType};
 use desktop::Desktop;
 pub use hbb_common::platform::linux::*;
@@ -50,7 +68,7 @@ lazy_static::lazy_static! {
             }
         }
     };
-    // https://github.com/rustdesk/rustdesk/issues/13705
+    // https://github.com/shopremote/shopremote/issues/13705
     // Check if `sudo -E` actually preserves environment.
     //
     // This flag is only used by `run_as_user()` (root service -> user session). If the current process is not
@@ -600,7 +618,7 @@ fn set_x11_env(desktop: &Desktop) {
 }
 
 #[inline]
-fn stop_rustdesk_servers() {
+fn stop_shopremote_servers() {
     let _ = run_cmds(&format!(
         r##"ps -ef | grep -E '{} +--server' | awk '{{print $2}}' | xargs -r kill -9"##,
         crate::get_app_name().to_lowercase(),
@@ -688,15 +706,17 @@ fn should_start_server(
 }
 
 // to-do: stop_server(&mut user_server); may not stop child correctly
-// stop_rustdesk_servers() is just a temp solution here.
+// stop_shopremote_servers() is just a temp solution here.
 fn force_stop_server() {
-    stop_rustdesk_servers();
+    stop_shopremote_servers();
     sleep_millis(super::SERVICE_INTERVAL);
 }
 
+/// Linux 시스템 서비스 시작
+/// 화면 캡처, 입력 시뮬레이션, IPC 수신을 위한 필요한 모든 컴포넌트 초기화
 pub fn start_os_service() {
     check_if_stop_service();
-    stop_rustdesk_servers();
+    stop_shopremote_servers();
     stop_subprocess();
     start_uinput_service();
 
@@ -774,7 +794,7 @@ pub fn start_os_service() {
         let keeps_headless = sid.is_empty() && desktop.is_headless();
         let keeps_session = sid == desktop.sid;
         if keeps_headless || keeps_session {
-            // for fixing https://github.com/rustdesk/rustdesk/issues/3129 to avoid too much dbus calling,
+            // for fixing https://github.com/shopremote/shopremote/issues/3129 to avoid too much dbus calling,
             sleep_millis(500);
         } else {
             sleep_millis(super::SERVICE_INTERVAL);
@@ -927,7 +947,7 @@ pub fn is_locked() -> bool {
     let values = get_values_of_seat0(&[0]);
     // Though the values can't be empty, we still add check here for safety.
     // Because we cannot guarantee whether the internal implementation will change in the future.
-    // https://github.com/rustdesk/hbb_common/blob/ebb4d4a48cf7ed6ca62e93f8ed124065c6408536/src/platform/linux.rs#L119
+    // https://github.com/shopremote/hbb_common/blob/ebb4d4a48cf7ed6ca62e93f8ed124065c6408536/src/platform/linux.rs#L119
     if values.is_empty() {
         log::debug!("Failed to check is locked, values vector is empty.");
         return false;
@@ -1240,7 +1260,7 @@ fn get_envs<'a>(
 
 /// Deprecated: Use `get_envs` instead.
 ///
-/// https://github.com/rustdesk/rustdesk/discussions/11959
+/// https://github.com/shopremote/shopremote/discussions/11959
 ///
 /// **Note**: This function is retained for conservative migration. The plan is to gradually
 /// transition all callers to `get_envs` after it proves stable and reliable. Once `get_envs`
@@ -1514,7 +1534,7 @@ mod desktop {
         pub xauth: String,
         pub home: String,
         pub dbus: String,
-        pub is_rustdesk_subprocess: bool,
+        pub is_shopremote_subprocess: bool,
         pub wl_display: String,
     }
 
@@ -1531,7 +1551,7 @@ mod desktop {
 
         #[inline]
         pub fn is_headless(&self) -> bool {
-            self.sid.is_empty() || self.is_rustdesk_subprocess
+            self.sid.is_empty() || self.is_shopremote_subprocess
         }
 
         fn get_display_xauth_wayland(&mut self) {
@@ -1772,14 +1792,14 @@ mod desktop {
         }
 
         fn set_is_subprocess(&mut self) {
-            self.is_rustdesk_subprocess = false;
+            self.is_shopremote_subprocess = false;
             let cmd = format!(
                 "ps -ef | grep '{}/xorg.conf' | grep -v grep | wc -l",
                 crate::get_app_name().to_lowercase()
             );
             if let Ok(res) = run_cmds(&cmd) {
                 if res.trim() != "0" {
-                    self.is_rustdesk_subprocess = true;
+                    self.is_shopremote_subprocess = true;
                 }
             }
         }
@@ -1789,7 +1809,7 @@ mod desktop {
                 // Xwayland display and xauth may not be available in a short time after login.
                 if is_xwayland_running() && !self.is_login_wayland() {
                     self.get_display_xauth_xwayland();
-                    self.is_rustdesk_subprocess = false;
+                    self.is_shopremote_subprocess = false;
                 } else if self.is_wayland() {
                     self.get_display_xauth_wayland();
                 }
@@ -1799,7 +1819,7 @@ mod desktop {
             let seat0_values = get_values_of_seat0_with_gdm_wayland(&[0, 1, 2]);
             if seat0_values[0].is_empty() {
                 *self = Self::default();
-                self.is_rustdesk_subprocess = false;
+                self.is_shopremote_subprocess = false;
                 return;
             }
 
@@ -1810,7 +1830,7 @@ mod desktop {
             if self.is_login_wayland() {
                 self.display = "".to_owned();
                 self.xauth = "".to_owned();
-                self.is_rustdesk_subprocess = false;
+                self.is_shopremote_subprocess = false;
                 return;
             }
 
@@ -1821,7 +1841,7 @@ mod desktop {
                 } else {
                     self.get_display_xauth_wayland();
                 }
-                self.is_rustdesk_subprocess = false;
+                self.is_shopremote_subprocess = false;
             } else {
                 self.get_display_x11();
                 self.get_xauth_x11();
@@ -1945,7 +1965,7 @@ pub fn uninstall_service(show_new_window: bool, _: bool) -> bool {
     log::info!("Uninstalling service...");
     let cp = switch_service(true);
     let app_name = crate::get_app_name().to_lowercase();
-    // systemctl kill rustdesk --tray, execute cp first
+    // systemctl kill shopremote --tray, execute cp first
     if !run_cmds_privileged(&format!(
         "{cp} systemctl disable {app_name}; systemctl stop {app_name};"
     )) {
@@ -1997,7 +2017,7 @@ pub fn check_autostart_config() -> ResultType<()> {
     let app_name = crate::get_app_name().to_lowercase();
     let path = format!("{home}/.config/autostart");
     let file = format!("{path}/{app_name}.desktop");
-    // https://github.com/rustdesk/rustdesk/issues/4863
+    // https://github.com/shopremote/shopremote/issues/4863
     std::fs::remove_file(&file).ok();
     /*
         std::fs::create_dir_all(&path).ok();
@@ -2096,7 +2116,7 @@ pub fn is_selinux_enforcing() -> bool {
 fn get_shortcuts_inhibitor_app_id() -> String {
     if is_flatpak() {
         // In Flatpak, FLATPAK_ID is set automatically by the runtime to the app ID
-        // (e.g., "com.rustdesk.RustDesk"). This is the most reliable source.
+        // (e.g., "kr.co.ilv.shopremote"). This is the most reliable source.
         // Fall back to constructing from app name if not available.
         match std::env::var("FLATPAK_ID") {
             Ok(id) if !id.is_empty() => format!("{}.desktop", id),

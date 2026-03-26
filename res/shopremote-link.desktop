@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=ShopRemote
+NoDisplay=true
+MimeType=x-scheme-handler/shopremote;
+TryExec=shopremote
+Exec=shopremote %u
+Icon=shopremote
+Terminal=false
+Type=Application
+StartupNotify=false
+StartupWMClass=shopremote

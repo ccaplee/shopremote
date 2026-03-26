@@ -2414,7 +2414,7 @@ class _AboutState extends State<_About> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Copyright © ${DateTime.now().toString().substring(0, 4)} Purslane Ltd.\n$license',
+                            'Copyright © ${DateTime.now().toString().substring(0, 4)} ShopRemote.\n$license',
                             style: const TextStyle(color: Colors.white),
                           ),
                           Text(
@@ -2602,8 +2602,8 @@ class _WaylandCardState extends State<WaylandCard> {
   //   busctl --user call org.freedesktop.impl.portal.PermissionStore \
   //   /org/freedesktop/impl/portal/PermissionStore org.freedesktop.impl.portal.PermissionStore \
   //   DeletePermission sss "gnome" "shortcuts-inhibitor" "<desktop-id>"
-  // On a native install this is typically "rustdesk.desktop"; on Flatpak it is usually
-  // the exported desktop ID derived from the Flatpak app-id (e.g. "com.rustdesk.ShopRemote.desktop").
+  // On a native install this is typically "shopremote.desktop"; on Flatpak it is usually
+  // the exported desktop ID derived from the Flatpak app-id (e.g. "com.shopremote.ShopRemote.desktop").
   //
   // We may add it back in the future if needed.
   final showResetInhibitorPermission = false;

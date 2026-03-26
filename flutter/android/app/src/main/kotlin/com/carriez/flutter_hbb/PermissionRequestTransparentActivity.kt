@@ -1,4 +1,4 @@
-package com.carriez.flutter_hbb
+package kr.co.ilv.shopremote
 
 import android.app.Activity
 import android.content.Intent

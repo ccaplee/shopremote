@@ -1,3 +1,28 @@
+// ============================================================================
+// ShopRemote 렌데부 중재자 모듈
+// ============================================================================
+// 렌데부 서버(hbbs)와의 통신을 관리하는 핵심 모듈입니다.
+//
+// 렌데부 서버의 역할:
+//   - 클라이언트 ID 등록 (접속 ID를 IP 주소에 매핑)
+//   - NAT 타입 감지 (홀펀칭 가능 여부 판단)
+//   - 피어 검색 (상대방의 IP/포트 조회)
+//   - 릴레이 서버 할당 (직접 연결 불가 시)
+//
+// 통신 흐름:
+//   1. 프로그램 시작 → 렌데부 서버에 ID 등록 (UDP)
+//   2. 접속 요청 → 렌데부 서버에서 상대방 주소 조회
+//   3. NAT 통과 시도 (UDP 홀펀칭)
+//   4. 실패 시 → 릴레이 서버를 통한 중계 연결
+//
+// 기본 서버: sc.ilv.co.kr (설정에서 변경 가능)
+//
+// 수정 가이드:
+//   - 서버 주소 변경: config.rs의 RENDEZVOUS_SERVERS 수정
+//   - 재연결 로직 변경: start 함수 내 루프 로직 수정
+//   - 새 프로토콜 메시지: protos에서 메시지 추가 후 핸들러 작성
+// ============================================================================
+
 use std::{
     net::SocketAddr,
     sync::{
@@ -51,12 +76,16 @@ pub struct RendezvousMediator {
 }
 
 impl RendezvousMediator {
+    // 렌데부 서버 연결을 재시작하는 함수
     pub fn restart() {
         SHOULD_EXIT.store(true, Ordering::SeqCst);
         MANUAL_RESTARTED.store(true, Ordering::SeqCst);
         log::info!("server restart");
     }
 
+    // 렌데부 서버와의 연결 메인 루프
+    // NAT 타입 테스트, 직접 연결 서버 시작, 음파 수신 시작
+    // 무한 루프로 계속 실행되며, 연결 실패 시 재접속 시도
     pub async fn start_all() {
         crate::test_nat_type();
         if config::is_outgoing_only() {
@@ -135,7 +164,7 @@ impl RendezvousMediator {
                     sleep(((timeout - elapsed) / 1000) as _).await;
                 }
             } else {
-                // https://github.com/rustdesk/rustdesk/issues/12233
+                // https://github.com/shopremote/shopremote/issues/12233
                 sleep(0.033).await;
             }
         }
@@ -165,7 +194,7 @@ impl RendezvousMediator {
             keep_alive: crate::DEFAULT_KEEP_ALIVE,
         };
 
-        let mut timer = crate::rustdesk_interval(interval(crate::TIMER_OUT));
+        let mut timer = crate::shopremote_interval(interval(crate::TIMER_OUT));
         const MIN_REG_TIMEOUT: i64 = 3_000;
         const MAX_REG_TIMEOUT: i64 = 30_000;
         let mut reg_timeout = MIN_REG_TIMEOUT;
@@ -351,7 +380,7 @@ impl RendezvousMediator {
             host_prefix: Self::get_host_prefix(&host),
             keep_alive: crate::DEFAULT_KEEP_ALIVE,
         };
-        let mut timer = crate::rustdesk_interval(interval(crate::TIMER_OUT));
+        let mut timer = crate::shopremote_interval(interval(crate::TIMER_OUT));
         let mut last_register_sent: Option<Instant> = None;
         let mut last_recv_msg = Instant::now();
         // we won't support connecting to multiple rendzvous servers any more, so we can use a global variable here.

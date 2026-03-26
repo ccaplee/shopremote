@@ -1,9 +1,20 @@
-// ============================================================
-// ShopRemote - main.dart
-// 앱 진입점 (Entry Point)
-// [ShopRemote] 앱 타이틀, 초기화 로직
-// Flutter 기반, Windows/macOS/Linux/Android/iOS 크로스플랫폼
-// ============================================================
+// ============================================================================
+// ShopRemote Flutter 앱 진입점 (main.dart)
+// ============================================================================
+// Flutter 기반 GUI의 시작점입니다.
+//
+// 주요 역할:
+//   1. Flutter 엔진 초기화
+//   2. Rust FFI 바인딩 초기화 (Flutter ↔ Rust 통신)
+//   3. 라우팅 설정 (메인 화면, 원격 접속 화면, 설정 등)
+//   4. 테마 및 다국어 설정
+//   5. 시스템 트레이 통합
+//
+// 수정 가이드:
+//   - 앱 테마 변경: ThemeData 설정 수정
+//   - 새 화면 추가: 라우팅 테이블에 경로 추가
+//   - 앱 아이콘 변경: flutter/assets/ 디렉토리의 이미지 교체
+// ============================================================================
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -43,6 +54,9 @@ int? kWindowId;
 WindowType? kWindowType;
 late List<String> kBootArgs;
 
+/// Flutter 앱의 메인 진입점
+/// args: 명령줄 인자 (윈도우 타입, 윈도우 ID, 설정 등)
+/// 분기: 모바일 -> runMobileApp(), 데스크톱 -> 윈도우 타입별 UI 초기화
 Future<void> main(List<String> args) async {
   earlyAssert();
   WidgetsFlutterBinding.ensureInitialized();

@@ -1,12 +1,12 @@
 {
-  "id": "com.rustdesk.RustDesk",
+  "id": "kr.co.ilv.ShopRemote",
   "runtime": "org.freedesktop.Platform",
   "runtime-version": "24.08",
   "sdk": "org.freedesktop.Sdk",
-  "command": "rustdesk",
+  "command": "shopremote",
   "cleanup": ["/include", "/lib/pkgconfig", "/share/gtk-doc"],
-  "rename-desktop-file": "rustdesk.desktop",
-  "rename-icon": "rustdesk",
+  "rename-desktop-file": "shopremote.desktop",
+  "rename-icon": "shopremote",
   "modules": [
     "shared-modules/libappindicator/libappindicator-gtk3-12.10.json",
     {
@@ -34,21 +34,21 @@
       ]
     },
     {
-      "name": "rustdesk",
+      "name": "shopremote",
       "buildsystem": "simple",
       "build-commands": [
-        "bsdtar -Oxf rustdesk.deb data.tar.xz | bsdtar -xf -",
+        "bsdtar -Oxf shopremote.deb data.tar.xz | bsdtar -xf -",
         "cp -r usr/* /app/",
-        "mkdir -p /app/bin && ln -s /app/share/rustdesk/rustdesk /app/bin/rustdesk"
+        "mkdir -p /app/bin && ln -s /app/share/shopremote/shopremote /app/bin/shopremote"
       ],
       "sources": [
         {
           "type": "file",
-          "path": "rustdesk.deb"
+          "path": "shopremote.deb"
         },
         {
           "type": "file",
-          "path": "com.rustdesk.RustDesk.metainfo.xml"
+          "path": "kr.co.ilv.ShopRemote.metainfo.xml"
         }
       ]
     }

@@ -1,3 +1,26 @@
+// ============================================================================
+// ShopRemote IPC (프로세스 간 통신) 모듈
+// ============================================================================
+// GUI 프로세스와 서비스 프로세스 간의 통신을 담당합니다.
+//
+// ShopRemote는 보안을 위해 두 개의 프로세스로 분리됩니다:
+//   1. 서비스 프로세스: 시스템 권한으로 실행, 화면 캡처/입력 시뮬레이션
+//   2. GUI 프로세스: 사용자 권한으로 실행, 화면 표시/사용자 입력
+//
+// IPC 통신 방식:
+//   - Windows: Named Pipe
+//   - Linux/macOS: Unix Domain Socket
+//
+// 주요 메시지:
+//   - Login: 원격 접속 인증 요청/응답
+//   - Config: 설정 변경 요청
+//   - OnlineStatus: 서버 연결 상태
+//
+// 수정 가이드:
+//   - 새 IPC 메시지 추가: Data enum에 새 variant 추가
+//   - IPC 소켓 경로 변경: get_ipc_path 함수 수정
+// ============================================================================
+
 use crate::{
     common::CheckTestNatType,
     privacy_mode::PrivacyModeState,
@@ -395,6 +418,8 @@ pub enum Data {
 }
 
 #[tokio::main(flavor = "current_thread")]
+/// IPC 서버 시작 - GUI와 서비스 프로세스 간의 통신을 담당
+/// postfix: IPC 이름 구분자 (예: "ui", "service")
 pub async fn start(postfix: &str) -> ResultType<()> {
     let mut incoming = new_listener(postfix).await?;
     loop {
@@ -426,6 +451,9 @@ pub async fn start(postfix: &str) -> ResultType<()> {
     }
 }
 
+/// IPC 수신 대기 소켓 생성
+/// postfix: IPC 소켓 이름 구분자
+/// 반환: Incoming - 새로운 클라이언트 연결을 수신할 리스너
 pub async fn new_listener(postfix: &str) -> ResultType<Incoming> {
     let path = Config::ipc_path(postfix);
     #[cfg(not(any(windows, target_os = "android", target_os = "ios")))]
@@ -546,14 +574,14 @@ async fn handle(data: Data, stream: &mut Connection) {
                 }
                 #[cfg(any(target_os = "macos", target_os = "linux"))]
                 if crate::is_main() {
-                    // below part is for main windows can be reopen during rustdesk installation and installing service from UI
+                    // below part is for main windows can be reopen during shopremote installation and installing service from UI
                     // this make new ipc server (domain socket) can be created.
                     std::fs::remove_file(&Config::ipc_path("")).ok();
                     #[cfg(target_os = "linux")]
                     {
                         hbb_common::sleep((crate::platform::SERVICE_INTERVAL * 2) as f32 / 1000.0)
                             .await;
-                        // https://github.com/rustdesk/rustdesk/discussions/9254
+                        // https://github.com/shopremote/shopremote/discussions/9254
                         crate::run_me::<&str>(vec!["--no-server"]).ok();
                     }
                     #[cfg(target_os = "macos")]

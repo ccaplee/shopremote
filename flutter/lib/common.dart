@@ -1,3 +1,21 @@
+// ============================================================================
+// ShopRemote Flutter 공통 유틸리티 (common.dart)
+// ============================================================================
+// Flutter UI 전체에서 사용하는 공통 함수와 상수를 정의합니다.
+//
+// 주요 내용:
+//   - Rust FFI 호출 래퍼 함수 (Rust 네이티브 코드 호출)
+//   - 공통 다이얼로그 (알림, 확인, 입력)
+//   - 플랫폼별 유틸리티 (파일 경로, 권한 체크 등)
+//   - ServerConfig 클래스 (기본 서버: sc.ilv.co.kr)
+//   - 네트워크 상태 체크
+//
+// 수정 가이드:
+//   - 기본 서버 변경: ServerConfig 클래스의 기본값 수정
+//   - 새 Rust 함수 호출: FFI 바인딩 추가 후 여기에 래퍼 작성
+//   - 공통 UI 위젯: 이 파일에 정의하여 재사용
+// ============================================================================
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
@@ -1551,6 +1569,9 @@ late FFI _globalFFI;
 
 FFI get gFFI => _globalFFI;
 
+/// 전역 FFI(Foreign Function Interface) 초기화
+/// Rust 백엔드와의 통신을 위한 FFI 객체 생성 및 Get 서비스 등록
+/// 앱 시작 시 한 번만 호출되어야 함
 Future<void> initGlobalFFI() async {
   debugPrint("_globalFFI init");
   _globalFFI = FFI(null);
@@ -2903,13 +2924,13 @@ class ServerConfig {
 
   /// from local options
   // [ShopRemote] 기본 서버 설정
-  // ID 서버와 릴레이 서버의 기본값을 자체 서버(222.122.131.191)로 지정
+  // ID 서버와 릴레이 서버의 기본값을 자체 서버(sc.ilv.co.kr)로 지정
   // 사용자가 설정 > 네트워크에서 언제든 변경 가능
   // 서버 변경 시 Public Key도 함께 업데이트 필요
   // Public Key: r8Mxm2lf9f5l9MGHufGp7aPiMEHcygeCPhcdps30b5w=
   ServerConfig.fromOptions(Map<String, dynamic> options)
-      : idServer = options['custom-rendezvous-server'] ?? "222.122.131.191",
-        relayServer = options['relay-server'] ?? "222.122.131.191",
+      : idServer = options['custom-rendezvous-server'] ?? "sc.ilv.co.kr",
+        relayServer = options['relay-server'] ?? "sc.ilv.co.kr",
         apiServer = options['api-server'] ?? "",
         key = options['key'] ?? "";
 }

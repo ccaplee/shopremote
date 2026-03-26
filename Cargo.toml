@@ -2,7 +2,7 @@
 # ShopRemote - 원격 데스크탑 솔루션
 # RustDesk 오픈소스(AGPL-3.0) 기반으로 제작
 # 원본: https://github.com/rustdesk/rustdesk
-# 수정일: 2026-03-19
+# 수정일: 2026-03-26
 # ============================================================
 [package]
 name = "shopremote"
@@ -219,10 +219,10 @@ exclude = ["vdi/host", "examples/custom_plugin"]
 libxdo-sys = { path = "libs/libxdo-sys-stub" }
 
 [package.metadata.winres]
-LegalCopyright = "Copyright © 2025 Purslane Ltd. All rights reserved."
-ProductName = "RustDesk"
-FileDescription = "RustDesk Remote Desktop"
-OriginalFilename = "rustdesk.exe"
+LegalCopyright = "Copyright © 2025 ShopRemote. All rights reserved."
+ProductName = "ShopRemote"
+FileDescription = "ShopRemote Remote Desktop"
+OriginalFilename = "shopremote.exe"
 
 [target.'cfg(target_os="windows")'.build-dependencies]
 winres = "0.1"
@@ -238,8 +238,8 @@ hound = "3.5"
 docopt = "1.1"
 
 [package.metadata.bundle]
-name = "RustDesk"
-identifier = "com.carriez.rustdesk"
+name = "ShopRemote"
+identifier = "kr.co.ilv.shopremote"
 icon = ["res/32x32.png", "res/128x128.png", "res/128x128@2x.png"]
 osx_minimum_system_version = "10.14"
 

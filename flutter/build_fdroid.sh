@@ -1,9 +1,9 @@
 #!/bin/bash
 
 #
-# Script to build F-Droid release of RustDesk
+# Script to build F-Droid release of ShopRemote
 #
-# Copyright (C) 2024, The RustDesk Authors
+# Copyright (C) 2024, The ShopRemote Authors
 #               2024, Vasyl Gello <vasek.gello@gmail.com>
 #
 
@@ -11,8 +11,8 @@
 #
 # It accepts the following arguments:
 #
-# - versionName from https://github.com/rustdesk/rustdesk/releases/download/fdroid-version/rustdesk-version.txt
-# - versionCode from https://github.com/rustdesk/rustdesk/releases/download/fdroid-version/rustdesk-version.txt
+# - versionName from https://github.com/shopremote/shopremote/releases/download/fdroid-version/shopremote-version.txt
+# - versionCode from https://github.com/shopremote/shopremote/releases/download/fdroid-version/shopremote-version.txt
 # - Android architecture to build APK for: armeabi-v7a arm64-v8av x86 x86_64
 # - The build step to execute:
 #
@@ -307,12 +307,12 @@ prebuild)
 		fi
 	fi
 
-	# Patch the RustDesk sources
+	# Patch the ShopRemote sources
 
 	git apply res/fdroid/patches/*.patch
 
 	# If Flutter version used to generate bridge files differs from Flutter
-	# version used to compile Rustdesk library, generate bridge using the
+	# version used to compile ShopRemote library, generate bridge using the
 	# `FLUTTER_BRIDGE_VERSION` an restore the pubspec later
 
 	if [ "${FLUTTER_VERSION}" != "${FLUTTER_BRIDGE_VERSION}" ]; then
@@ -357,7 +357,7 @@ prebuild)
 		git reset
 	fi
 
-	# Install Flutter version for RustDesk library build
+	# Install Flutter version for ShopRemote library build
 
 	prepare_flutter "${FLUTTER_VERSION}" "${HOME}/flutter"
 
@@ -447,7 +447,7 @@ build)
 
 	bash flutter/build_android_deps.sh "${ANDROID_ABI}"
 
-	# Build rustdesk lib
+	# Build shopremote lib
 
 	cargo ndk \
 		--platform 21 \
@@ -455,12 +455,12 @@ build)
 		--bindgen \
 		build \
 		--release \
-		--features "${RUSTDESK_FEATURES}"
+		--features "${SHOPREMOTE_FEATURES}"
 
 	mkdir -p "flutter/android/app/src/main/jniLibs/${ANDROID_ABI}"
 
-	cp "target/${RUST_TARGET}/release/liblibrustdesk.so" \
-		"flutter/android/app/src/main/jniLibs/${ANDROID_ABI}/librustdesk.so"
+	cp "target/${RUST_TARGET}/release/libshopremote.so" \
+		"flutter/android/app/src/main/jniLibs/${ANDROID_ABI}/libshopremote.so"
 
 	cp "${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/${NDK_TARGET}/libc++_shared.so" \
 		"flutter/android/app/src/main/jniLibs/${ANDROID_ABI}/"
