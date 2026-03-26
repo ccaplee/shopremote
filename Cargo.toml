@@ -6,7 +6,7 @@
 # ============================================================
 [package]
 name = "shopremote"
-version = "1.4.6"
+version = "2.0.1"
 authors = ["ShopRemote Inc <support@shopcast.kr>"]
 edition = "2021"
 build= "build.rs"
@@ -15,7 +15,7 @@ default-run = "shopremote"   # 실행 바이너리 이름
 rust-version = "1.75"
 
 [lib]
-name = "libshopremote"
+name = "shopremote"
 crate-type = ["cdylib", "staticlib", "rlib"]
 
 [[bin]]

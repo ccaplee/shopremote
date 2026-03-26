@@ -1058,18 +1058,18 @@ struct wire_uint_8_list *new_uint_8_list_0(int32_t len);
 void free_WireSyncReturn(WireSyncReturn ptr);
 
 /**
- * FFI for rustdesk core's main entry.
+ * FFI for ShopRemote core's main entry.
  * Return true if the app should continue running with UI(possibly Flutter), false if the app should exit.
  */
-bool rustdesk_core_main(void);
+bool shopremote_core_main(void);
 
 void handle_applicationShouldOpenUntitledFile(void);
 
-char **rustdesk_core_main_args(int *args_len);
+char **shopremote_core_main_args(int *args_len);
 
 void free_c_args(char **ptr, int len);
 
-int32_t get_rustdesk_app_name(uint16_t *buffer, int32_t length);
+int32_t get_shopremote_app_name(uint16_t *buffer, int32_t length);
 
 const uint8_t *session_get_rgba(const uint32_t *session_uuid_str, uintptr_t display);
 

@@ -2770,7 +2770,7 @@ class _WaylandCardState extends State<WaylandCard> {
       showConfirmMsgBox,
       tip: 'clear_Wayland_screen_selection_tip',
       style: ButtonStyle(
-        backgroundColor: MaterialStateProperty.all<Color>(
+        backgroundColor: WidgetStateProperty.all<Color>(
             Theme.of(context).colorScheme.error.withOpacity(0.75)),
       ),
     );
@@ -2813,7 +2813,7 @@ class _WaylandCardState extends State<WaylandCard> {
         showConfirmMsgBox,
         tip: 'clear-shortcuts-inhibitor-permission-tip',
         style: ButtonStyle(
-          backgroundColor: MaterialStateProperty.all<Color>(
+          backgroundColor: WidgetStateProperty.all<Color>(
               Theme.of(context).colorScheme.error.withOpacity(0.75)),
         ),
       ),

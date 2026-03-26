@@ -122,7 +122,7 @@ class PlatformFFI {
         : isLinux
             ? DynamicLibrary.open('libshopremote.so')
             : isWindows
-                ? DynamicLibrary.open('libshopremote.dll')
+                ? DynamicLibrary.open('shopremote.dll')
                 :
                 // Use executable itself as the dynamic library for MacOS.
                 // Multiple dylib instances will cause some global instances to be invalid.
