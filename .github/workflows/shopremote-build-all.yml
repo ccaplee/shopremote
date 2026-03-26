@@ -1,0 +1,206 @@
+name: ShopRemote Build (Windows + macOS)
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      build_windows:
+        description: 'Windows 빌드'
+        type: boolean
+        default: true
+      build_macos:
+        description: 'macOS 빌드'
+        type: boolean
+        default: true
+
+env:
+  RUST_VERSION: "1.75"
+  LLVM_VERSION: "15.0.6"
+  FLUTTER_VERSION: "3.24.5"
+  VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
+  VCPKG_COMMIT_ID: "120deac3062162151622ca4860575a33844ba10b"
+  VERSION: "2.0.1"
+
+jobs:
+  # ============================================================
+  # Windows x86_64 빌드
+  # ============================================================
+  build-windows:
+    name: Windows x86_64
+    runs-on: windows-2022
+    if: ${{ github.event_name == 'push' || inputs.build_windows }}
+    steps:
+      - name: Export GitHub Actions cache environment variables
+        uses: actions/github-script@v6
+        with:
+          script: |
+            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+
+      - name: Checkout source code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install LLVM and Clang
+        uses: KyleMayes/install-llvm-action@v1
+        with:
+          version: ${{ env.LLVM_VERSION }}
+
+      - name: Install Flutter
+        uses: subosito/flutter-action@v2.12.0
+        with:
+          channel: "stable"
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          targets: x86_64-pc-windows-msvc
+          components: "rustfmt"
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: windows-2022
+
+      - name: Setup vcpkg with Github Actions binary cache
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgDirectory: C:\vcpkg
+          vcpkgGitCommitId: ${{ env.VCPKG_COMMIT_ID }}
+          doNotCache: false
+
+      - name: Install vcpkg dependencies
+        env:
+          VCPKG_DEFAULT_HOST_TRIPLET: x64-windows-static
+        run: |
+          if ! $VCPKG_ROOT/vcpkg \
+            install \
+            --triplet x64-windows-static \
+            --x-install-root="$VCPKG_ROOT/installed"; then
+            find "${VCPKG_ROOT}/" -name "*.log" | while read -r _1; do
+              echo "$_1:"
+              cat "$_1"
+            done
+            exit 1
+          fi
+        shell: bash
+
+      - name: Build ShopRemote
+        run: |
+          python3 .\build.py --portable --hwcodec --flutter --vram --skip-portable-pack
+          mv ./flutter/build/windows/x64/runner/Release ./shopremote-windows
+
+      - name: find Runner.res
+        continue-on-error: true
+        shell: bash
+        run: |
+          runner_res=$(find . -name "Runner.res");
+          if [ "$runner_res" != "" ]; then
+            cp $runner_res ./libs/portable/Runner.res;
+          fi
+
+      - name: Build self-extracted executable
+        shell: bash
+        run: |
+          pushd ./libs/portable
+          pip3 install toml
+          python3 ./generate.py -f ../../shopremote-windows/ -o . -e ../../flutter/build/windows/x64/runner/Release/shopremote.exe
+          popd
+          mkdir -p ./SignOutput
+          mv ./target/release/shopremote-portable-packer.exe ./SignOutput/shopremote-${{ env.VERSION }}-x86_64.exe
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: shopremote-windows-x86_64
+          path: |
+            ./SignOutput/shopremote-${{ env.VERSION }}-x86_64.exe
+            ./shopremote-windows/
+
+  # ============================================================
+  # macOS 빌드 (Apple Silicon)
+  # ============================================================
+  build-macos:
+    name: macOS arm64
+    runs-on: macos-latest
+    if: ${{ github.event_name == 'push' || inputs.build_macos }}
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Flutter
+        uses: subosito/flutter-action@v2.12.0
+        with:
+          channel: "stable"
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: "1.81"
+          targets: aarch64-apple-darwin
+          components: "rustfmt"
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: macos-latest
+
+      - name: Install vcpkg dependencies
+        run: |
+          brew install nasm yasm
+          export VCPKG_ROOT=$HOME/vcpkg
+          git clone https://github.com/Microsoft/vcpkg.git $VCPKG_ROOT
+          cd $VCPKG_ROOT
+          git checkout ${{ env.VCPKG_COMMIT_ID }}
+          ./bootstrap-vcpkg.sh
+          $VCPKG_ROOT/vcpkg install --triplet arm64-osx --x-install-root=$VCPKG_ROOT/installed
+
+      - name: Build ShopRemote
+        run: |
+          export VCPKG_ROOT=$HOME/vcpkg
+          python3 build.py --flutter
+
+      - name: Create DMG
+        run: |
+          cd flutter
+          # 앱 서명 (ad-hoc)
+          codesign --deep --force --sign - build/macos/Build/Products/Release/ShopRemote.app
+          # DMG 생성
+          hdiutil create -volname "ShopRemote" -srcfolder build/macos/Build/Products/Release/ShopRemote.app -ov -format UDZO ../ShopRemote-${{ env.VERSION }}-macos-arm64.dmg
+
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: shopremote-macos-arm64
+          path: ShopRemote-${{ env.VERSION }}-macos-arm64.dmg
+
+  # ============================================================
+  # 릴리스 생성 (태그 push 시)
+  # ============================================================
+  create-release:
+    name: Create Release
+    needs: [build-windows, build-macos]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          draft: false
+          prerelease: false
+          files: |
+            shopremote-windows-x86_64/SignOutput/shopremote-${{ env.VERSION }}-x86_64.exe
+            shopremote-macos-arm64/ShopRemote-${{ env.VERSION }}-macos-arm64.dmg
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
