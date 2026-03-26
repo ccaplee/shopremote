@@ -51,4 +51,4 @@ AGPL-3.0 — 소스코드 공개 의무 라이선스
 
 ---
 
-© 2024 ShopRemote Inc. support@shopremote.kr
+© 2024 ShopRemote Inc. support@shopcast.kr

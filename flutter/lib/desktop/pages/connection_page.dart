@@ -43,7 +43,7 @@ class _OnlineStatusWidgetState extends State<OnlineStatusWidget> {
   void onUsePublicServerGuide() {
     // ShopRemote: 유료 구독 페이지 비활성화
     /*
-    const url = "https://shopremote.kr/pricing";
+    const url = "https://shopcast.kr/pricing";
     canLaunchUrlString(url).then((can) {
       if (can) {
         launchUrlString(url);

@@ -10,7 +10,7 @@ RustDesk 1.4.6 오픈소스 기반으로 ShopRemote 브랜드로 커스터마이
 | RustDesk | ShopRemote |
 | rustdesk | shopremote |
 | carriez | ShopRemote Inc |
-| info@rustdesk.com | support@shopremote.kr |
+| info@rustdesk.com | support@shopcast.kr |
 | https://rustdesk.com | https://ai.ilv.co.kr |
 | com.carriez.RustDesk | com.shopremote.app |
 

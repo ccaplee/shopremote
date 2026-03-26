@@ -497,7 +497,7 @@ def update_license_file(app_name):
     license_file = Path(sys.argv[0]).parent.joinpath("Package/License.rtf")
     with open(license_file, "r", encoding="utf-8") as f:
         license_content = f.read()
-    license_content = license_content.replace("website shopremote.kr and other ", "")
+    license_content = license_content.replace("website shopcast.kr and other ", "")
     license_content = license_content.replace("ShopRemote", app_name)
     license_content = re.sub("ShopRemote", app_name, license_content, flags=re.IGNORECASE)
     with open(license_file, "w", encoding="utf-8") as f:

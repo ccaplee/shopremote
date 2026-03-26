@@ -67,7 +67,7 @@ fn main() {
     );
     let matches = App::new("shopremote")
         .version(crate::VERSION)
-        .author("ShopRemote Inc<support@shopremote.kr>")
+        .author("ShopRemote Inc<support@shopcast.kr>")
         .about("ShopRemote command line tool")
         .args_from_usage(&args)
         .get_matches();

@@ -93,7 +93,7 @@ class ConnectStatus: Reactor.Component {
     }
 
     event click $(#setup-server) () {
-        handler.open_url("https://shopremote.kr");
+        handler.open_url("https://shopcast.kr");
     }
 }
 
@@ -600,8 +600,8 @@ class MyIdMenu: Reactor.Component {
         msgbox("custom-nocancel-nook-hasclose", translate("About") + " " + name, "<div style='line-height: 2em'> \
             <div>Version: " + handler.get_version() + " \
             <div>Fingerprint: " + handler.get_fingerprint() + " \
-            <div .link .custom-event url='https://shopremote.kr'>" + translate("Privacy Statement") + "</div> \
-            <div .link .custom-event url='https://shopremote.kr'>" + translate("Website") + "</div> \
+            <div .link .custom-event url='https://shopcast.kr'>" + translate("Privacy Statement") + "</div> \
+            <div .link .custom-event url='https://shopcast.kr'>" + translate("Website") + "</div> \
 	    <div style='background: #2c8cff; color: white; padding: 1em; margin-top: 1em;'>Copyright &copy; 2025 ShopRemote.\
             <br />" + handler.get_license() + " \
             <p style='font-weight: bold'>" + translate("Slogan_tip") + "</p>\
@@ -833,10 +833,10 @@ class UpdateMe: Reactor.Component {
     }
 
     event click $(#install-me) {
-        handler.open_url("https://shopremote.kr");
+        handler.open_url("https://shopcast.kr");
         return;
         if (!is_win) {
-            handler.open_url("https://shopremote.kr");
+            handler.open_url("https://shopcast.kr");
             return;
         }
         var url = software_update_url + '.' + handler.get_software_ext();
@@ -1287,7 +1287,7 @@ event keydown (evt) {
 $(body).content(<div style="size:*"><App /><div #msgbox /></div>);
 
 event click $(#powered-by) {
-    handler.open_url("https://shopremote.kr");
+    handler.open_url("https://shopcast.kr");
 }
 
 event click $(#open-settings) (_, me) {

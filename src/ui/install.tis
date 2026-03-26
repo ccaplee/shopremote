@@ -50,7 +50,7 @@ class Install: Reactor.Component {
     }
 
     event click $(#agreement) {
-        view.open_url("https://shopremote.kr");
+        view.open_url("https://shopcast.kr");
     }
 
     event click $(#submit) {

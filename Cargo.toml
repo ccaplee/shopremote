@@ -7,7 +7,7 @@
 [package]
 name = "shopremote"
 version = "1.4.6"
-authors = ["ShopRemote Inc <support@shopremote.kr>"]
+authors = ["ShopRemote Inc <support@shopcast.kr>"]
 edition = "2021"
 build= "build.rs"
 description = "ShopRemote Remote Desktop"

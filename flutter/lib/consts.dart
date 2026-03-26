@@ -1,8 +1,8 @@
 // ============================================================
 // ShopRemote - consts.dart
 // 앱 전역 상수 정의 파일
-// [ShopRemote] 브랜드 관련 URL, 문자열은 shopremote.kr 기준으로 수정됨
-// ShopRemote 브랜드 URL 설정 (shopremote.kr)
+// [ShopRemote] 브랜드 관련 URL, 문자열은 shopcast.kr 기준으로 수정됨
+// ShopRemote 브랜드 URL 설정 (shopcast.kr)
 // ============================================================
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';

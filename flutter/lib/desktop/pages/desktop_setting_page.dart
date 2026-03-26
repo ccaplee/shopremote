@@ -2468,7 +2468,7 @@ class _AboutState extends State<_About> {
                         .marginSymmetric(vertical: 4.0)),
               InkWell(
                   onTap: () {
-                    launchUrlString('https://shopremote.kr/privacy.html');
+                    launchUrlString('https://shopcast.kr/privacy.html');
                   },
                   child: Text(
                     translate('Privacy Statement'),
@@ -2476,7 +2476,7 @@ class _AboutState extends State<_About> {
                   ).marginSymmetric(vertical: 4.0)),
               InkWell(
                   onTap: () {
-                    launchUrlString('https://shopremote.kr');
+                    launchUrlString('https://shopcast.kr');
                   },
                   child: Text(
                     translate('Website'),

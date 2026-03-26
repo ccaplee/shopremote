@@ -35,7 +35,7 @@ class SettingsPage extends StatefulWidget implements PageShape {
   State<SettingsPage> createState() => _SettingsState();
 }
 
-const url = 'https://shopremote.kr/';
+const url = 'https://shopcast.kr/';
 
 enum KeepScreenOn {
   never,
@@ -952,7 +952,7 @@ class _SettingsState extends State<SettingsPage> with WidgetsBindingObserver {
                 title: Text(translate("Version: ") + version),
                 value: Padding(
                   padding: EdgeInsets.symmetric(vertical: 8),
-                  child: Text('shopremote.kr',
+                  child: Text('shopcast.kr',
                       style: TextStyle(
                         decoration: TextDecoration.underline,
                       )),
@@ -977,7 +977,7 @@ class _SettingsState extends State<SettingsPage> with WidgetsBindingObserver {
             SettingsTile(
               title: Text(translate("Privacy Statement")),
               onPressed: (context) =>
-                  launchUrlString('https://shopremote.kr/privacy.html'),
+                  launchUrlString('https://shopcast.kr/privacy.html'),
               leading: Icon(Icons.privacy_tip),
             )
           ],
@@ -1090,12 +1090,12 @@ void showAbout(OverlayDialogManager dialogManager) {
         Text('Version: $version'),
         InkWell(
             onTap: () async {
-              const url = 'https://shopremote.kr/';
+              const url = 'https://shopcast.kr/';
               await launchUrl(Uri.parse(url));
             },
             child: Padding(
               padding: EdgeInsets.symmetric(vertical: 8),
-              child: Text('shopremote.kr',
+              child: Text('shopcast.kr',
                   style: TextStyle(
                     decoration: TextDecoration.underline,
                   )),
