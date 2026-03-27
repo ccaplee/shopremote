@@ -16,7 +16,7 @@ on:
         default: true
 
 env:
-  RUST_VERSION: "1.85"
+  RUST_VERSION: "1.88"
   LLVM_VERSION: "15.0.6"
   FLUTTER_VERSION: "3.24.5"
   VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
@@ -153,11 +153,11 @@ jobs:
           brew install nasm yasm
           export VCPKG_ROOT=$HOME/vcpkg
           git clone https://github.com/Microsoft/vcpkg.git $VCPKG_ROOT
-          cd $VCPKG_ROOT
+          pushd $VCPKG_ROOT
           git checkout ${{ env.VCPKG_COMMIT_ID }}
           ./bootstrap-vcpkg.sh
+          popd
           $VCPKG_ROOT/vcpkg install \
-            --overlay-ports=$GITHUB_WORKSPACE/res/vcpkg \
             --triplet arm64-osx \
             --x-install-root=$VCPKG_ROOT/installed
 
