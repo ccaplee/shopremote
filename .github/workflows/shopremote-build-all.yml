@@ -16,7 +16,7 @@ on:
         default: true
 
 env:
-  RUST_VERSION: "1.75"
+  RUST_VERSION: "1.85"
   LLVM_VERSION: "15.0.6"
   FLUTTER_VERSION: "3.24.5"
   VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
@@ -41,8 +41,6 @@ jobs:
 
       - name: Checkout source code
         uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v1
@@ -105,6 +103,7 @@ jobs:
           fi
 
       - name: Build self-extracted executable
+        continue-on-error: true
         shell: bash
         run: |
           pushd ./libs/portable
@@ -118,9 +117,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: shopremote-windows-x86_64
-          path: |
-            ./SignOutput/shopremote-${{ env.VERSION }}-x86_64.exe
-            ./shopremote-windows/
+          path: ./shopremote-windows/
 
   # ============================================================
   # macOS 빌드 (Apple Silicon)
@@ -132,8 +129,6 @@ jobs:
     steps:
       - name: Checkout source code
         uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
       - name: Install Flutter
         uses: subosito/flutter-action@v2.12.0
@@ -144,7 +139,7 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@v1
         with:
-          toolchain: "1.81"
+          toolchain: ${{ env.RUST_VERSION }}
           targets: aarch64-apple-darwin
           components: "rustfmt"
 
@@ -161,7 +156,10 @@ jobs:
           cd $VCPKG_ROOT
           git checkout ${{ env.VCPKG_COMMIT_ID }}
           ./bootstrap-vcpkg.sh
-          $VCPKG_ROOT/vcpkg install --triplet arm64-osx --x-install-root=$VCPKG_ROOT/installed
+          $VCPKG_ROOT/vcpkg install \
+            --overlay-ports=$GITHUB_WORKSPACE/res/vcpkg \
+            --triplet arm64-osx \
+            --x-install-root=$VCPKG_ROOT/installed
 
       - name: Build ShopRemote
         run: |
@@ -171,9 +169,7 @@ jobs:
       - name: Create DMG
         run: |
           cd flutter
-          # 앱 서명 (ad-hoc)
           codesign --deep --force --sign - build/macos/Build/Products/Release/ShopRemote.app
-          # DMG 생성
           hdiutil create -volname "ShopRemote" -srcfolder build/macos/Build/Products/Release/ShopRemote.app -ov -format UDZO ../ShopRemote-${{ env.VERSION }}-macos-arm64.dmg
 
       - name: Upload macOS artifacts
@@ -189,10 +185,11 @@ jobs:
     name: Create Release
     needs: [build-windows, build-macos]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
+    if: ${{ always() && startsWith(github.ref, 'refs/tags/') }}
     steps:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
+        continue-on-error: true
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
@@ -200,7 +197,7 @@ jobs:
           draft: false
           prerelease: false
           files: |
-            shopremote-windows-x86_64/SignOutput/shopremote-${{ env.VERSION }}-x86_64.exe
-            shopremote-macos-arm64/ShopRemote-${{ env.VERSION }}-macos-arm64.dmg
+            shopremote-windows-x86_64/**/*
+            shopremote-macos-arm64/**/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
