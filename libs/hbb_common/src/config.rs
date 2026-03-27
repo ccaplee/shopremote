@@ -1222,6 +1222,22 @@ impl Config {
         log::info!("id updated from {} to {}", id, new_id);
     }
 
+    pub fn get_permanent_password() -> String {
+        let config = CONFIG.read().unwrap();
+        let password = config.password.clone();
+        drop(config);
+        if password.is_empty() {
+            HARD_SETTINGS
+                .read()
+                .unwrap()
+                .get("password")
+                .map(|v| v.to_owned())
+                .unwrap_or_default()
+        } else {
+            password
+        }
+    }
+
     pub fn set_permanent_password(password: &str) {
         if Self::is_disable_change_permanent_password() {
             return;
