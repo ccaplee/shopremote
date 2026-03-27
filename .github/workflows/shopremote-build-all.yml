@@ -16,7 +16,7 @@ on:
         default: true
 
 env:
-  RUST_VERSION: "1.88"
+  RUST_VERSION: "1.94"
   LLVM_VERSION: "15.0.6"
   FLUTTER_VERSION: "3.24.5"
   VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
