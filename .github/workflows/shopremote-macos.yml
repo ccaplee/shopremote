@@ -12,7 +12,7 @@ concurrency:
 
 env:
   RUST_VERSION: "stable"
-  FLUTTER_VERSION: "3.24.5"
+  FLUTTER_VERSION: "3.41.6"
   VERSION: "1.4.6"
 
 jobs:

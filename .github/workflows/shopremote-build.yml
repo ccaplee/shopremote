@@ -14,7 +14,7 @@ on:
 
 env:
   RUST_VERSION: "stable"
-  FLUTTER_VERSION: "3.24.5"
+  FLUTTER_VERSION: "3.41.6"
   VERSION: "1.4.6"
   CARGO_NDK_VERSION: "3.0.0"
   NDK_VERSION: "r27c"
