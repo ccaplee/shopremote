@@ -18,9 +18,9 @@ on:
 # in this file!
 
 env:
-  SCITER_RUST_VERSION: "1.85" # updated: edition2024 required by deps, was 1.75
-  RUST_VERSION: "1.85" # updated: edition2024 required by deps, was 1.75
-  MAC_RUST_VERSION: "1.85" # updated: edition2024 required by deps, was 1.81
+  SCITER_RUST_VERSION: "1.88" # updated: deps require rustc 1.88 (time, image, home)
+  RUST_VERSION: "1.88" # updated: deps require rustc 1.88 (time, image, home)
+  MAC_RUST_VERSION: "1.88" # updated: deps require rustc 1.88 (time, image, home)
   CARGO_NDK_VERSION: "3.1.2"
   SCITER_ARMV7_CMAKE_VERSION: "3.29.7"
   SCITER_NASM_DEBVERSION: "2.15.05-1"
