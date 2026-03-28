@@ -188,6 +188,7 @@ jobs:
 
       - name: Build shopremote
         run: |
+          chmod +x build.py
           ./build.py --flutter ${{ matrix.job.extra-build-args }}
 
       - name: create unsigned dmg
