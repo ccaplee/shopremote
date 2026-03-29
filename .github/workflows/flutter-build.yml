@@ -521,11 +521,11 @@ jobs:
           rustup target add ${{ matrix.job.target }}
           cargo build --features flutter,hwcodec --release --target aarch64-apple-ios --lib
           
-      - name: Upload liblibshopremote.a Artifacts
+      - name: Upload libshopremote.a Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: liblibshopremote.a
-          path: target/aarch64-apple-ios/release/liblibshopremote.a
+          name: libshopremote.a
+          path: target/aarch64-apple-ios/release/libshopremote.a
 
       - name: Build shopremote
         shell: bash
@@ -719,6 +719,10 @@ jobs:
             sed -i -e "s/platform :osx, '.*'/platform :osx, '${MIN_MACOS_VERSION}'/" flutter/macos/Podfile
             sed -i -e "s/osx_minimum_system_version = \"[0-9]*.[0-9]*\"/osx_minimum_system_version = \"${MIN_MACOS_VERSION}\"/" Cargo.toml
             sed -i -e "s/MACOSX_DEPLOYMENT_TARGET = [0-9]*.[0-9]*;/MACOSX_DEPLOYMENT_TARGET = ${MIN_MACOS_VERSION};/" flutter/macos/Runner.xcodeproj/project.pbxproj
+          fi
+          if [ "${{ matrix.job.target }}" = "x86_64-apple-darwin" ]; then
+            # Xcode project has ARCHS = arm64 hardcoded; override for x86_64 builds
+            sed -i -e 's/ARCHS = arm64;/ARCHS = x86_64;/g' flutter/macos/Runner.xcodeproj/project.pbxproj
           fi
           ./build.py --flutter --hwcodec --unix-file-copy-paste ${{ matrix.job.extra-build-args }}
 
@@ -982,22 +986,22 @@ jobs:
             aarch64-linux-android)
               ./flutter/ndk_arm64.sh
               mkdir -p ./flutter/android/app/src/main/jniLibs/arm64-v8a
-              cp ./target/${{ matrix.job.target }}/release/liblibshopremote.so ./flutter/android/app/src/main/jniLibs/arm64-v8a/libshopremote.so
+              cp ./target/${{ matrix.job.target }}/release/libshopremote.so ./flutter/android/app/src/main/jniLibs/arm64-v8a/libshopremote.so
             ;;
             armv7-linux-androideabi)
               ./flutter/ndk_arm.sh
               mkdir -p ./flutter/android/app/src/main/jniLibs/armeabi-v7a
-              cp ./target/${{ matrix.job.target }}/release/liblibshopremote.so ./flutter/android/app/src/main/jniLibs/armeabi-v7a/libshopremote.so
+              cp ./target/${{ matrix.job.target }}/release/libshopremote.so ./flutter/android/app/src/main/jniLibs/armeabi-v7a/libshopremote.so
             ;;
             x86_64-linux-android)
               ./flutter/ndk_x64.sh
               mkdir -p ./flutter/android/app/src/main/jniLibs/x86_64
-              cp ./target/${{ matrix.job.target }}/release/liblibshopremote.so ./flutter/android/app/src/main/jniLibs/x86_64/libshopremote.so
+              cp ./target/${{ matrix.job.target }}/release/libshopremote.so ./flutter/android/app/src/main/jniLibs/x86_64/libshopremote.so
             ;;
             i686-linux-android)
               ./flutter/ndk_x86.sh
               mkdir -p ./flutter/android/app/src/main/jniLibs/x86
-              cp ./target/${{ matrix.job.target }}/release/liblibshopremote.so ./flutter/android/app/src/main/jniLibs/x86/libshopremote.so
+              cp ./target/${{ matrix.job.target }}/release/libshopremote.so ./flutter/android/app/src/main/jniLibs/x86/libshopremote.so
             ;;
           esac
 
@@ -1005,7 +1009,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: libshopremote.so.${{ matrix.job.target }}
-          path: ./target/${{ matrix.job.target }}/release/liblibshopremote.so
+          path: ./target/${{ matrix.job.target }}/release/libshopremote.so
 
       - name: Build shopremote
         shell: bash
@@ -1021,7 +1025,7 @@ jobs:
             aarch64-linux-android)
               mkdir -p ./flutter/android/app/src/main/jniLibs/arm64-v8a
               cp ${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so ./flutter/android/app/src/main/jniLibs/arm64-v8a/
-              cp ./target/${{ matrix.job.target }}/release/liblibshopremote.so ./flutter/android/app/src/main/jniLibs/arm64-v8a/libshopremote.so
+              cp ./target/${{ matrix.job.target }}/release/libshopremote.so ./flutter/android/app/src/main/jniLibs/arm64-v8a/libshopremote.so
               # build flutter
               pushd flutter
               flutter build apk "--${{ matrix.job.reltype }}" --target-platform android-arm64 --split-per-abi
@@ -1030,7 +1034,7 @@ jobs:
             armv7-linux-androideabi)
               mkdir -p ./flutter/android/app/src/main/jniLibs/armeabi-v7a
               cp ${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/arm-linux-androideabi/libc++_shared.so ./flutter/android/app/src/main/jniLibs/armeabi-v7a/
-              cp ./target/${{ matrix.job.target }}/release/liblibshopremote.so ./flutter/android/app/src/main/jniLibs/armeabi-v7a/libshopremote.so
+              cp ./target/${{ matrix.job.target }}/release/libshopremote.so ./flutter/android/app/src/main/jniLibs/armeabi-v7a/libshopremote.so
               # build flutter
               pushd flutter
               flutter build apk "--${{ matrix.job.reltype }}" --target-platform android-arm --split-per-abi
@@ -1039,7 +1043,7 @@ jobs:
             x86_64-linux-android)
               mkdir -p ./flutter/android/app/src/main/jniLibs/x86_64
               cp ${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/x86_64-linux-android/libc++_shared.so ./flutter/android/app/src/main/jniLibs/x86_64/
-              cp ./target/${{ matrix.job.target }}/release/liblibshopremote.so ./flutter/android/app/src/main/jniLibs/x86_64/libshopremote.so
+              cp ./target/${{ matrix.job.target }}/release/libshopremote.so ./flutter/android/app/src/main/jniLibs/x86_64/libshopremote.so
               # build flutter
               pushd flutter
               flutter build apk "--${{ matrix.job.reltype }}" --target-platform android-x64 --split-per-abi
@@ -1048,7 +1052,7 @@ jobs:
             i686-linux-android)
               mkdir -p ./flutter/android/app/src/main/jniLibs/x86
               cp ${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/i686-linux-android/libc++_shared.so ./flutter/android/app/src/main/jniLibs/x86/
-              cp ./target/${{ matrix.job.target }}/release/liblibshopremote.so ./flutter/android/app/src/main/jniLibs/x86/libshopremote.so
+              cp ./target/${{ matrix.job.target }}/release/libshopremote.so ./flutter/android/app/src/main/jniLibs/x86/libshopremote.so
               # build flutter
               pushd flutter
               flutter build apk "--${{ matrix.job.reltype }}" --target-platform android-x86 --split-per-abi
@@ -1226,14 +1230,10 @@ jobs:
           sed -i "s/org.gradle.jvmargs=-Xmx1024M/org.gradle.jvmargs=-Xmx2g/g" ./flutter/android/gradle.properties
           # temporary use debug sign config
           sed -i "s/signingConfigs.release/signingConfigs.debug/g" ./flutter/android/app/build.gradle
-          mv ./flutter/android/app/src/main/jniLibs/arm64-v8a/liblibshopremote.so ./flutter/android/app/src/main/jniLibs/arm64-v8a/libshopremote.so
           cp ${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so ./flutter/android/app/src/main/jniLibs/arm64-v8a/
-          mv ./flutter/android/app/src/main/jniLibs/armeabi-v7a/liblibshopremote.so ./flutter/android/app/src/main/jniLibs/armeabi-v7a/libshopremote.so
           cp ${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/arm-linux-androideabi/libc++_shared.so ./flutter/android/app/src/main/jniLibs/armeabi-v7a/
-          mv ./flutter/android/app/src/main/jniLibs/x86_64/liblibshopremote.so ./flutter/android/app/src/main/jniLibs/x86_64/libshopremote.so
           cp ${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/x86_64-linux-android/libc++_shared.so ./flutter/android/app/src/main/jniLibs/x86_64/
           if [ "${{ env.reltype }}" = "debug" ]; then
-            mv ./flutter/android/app/src/main/jniLibs/x86/liblibshopremote.so ./flutter/android/app/src/main/jniLibs/x86/libshopremote.so
             cp ${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/i686-linux-android/libc++_shared.so ./flutter/android/app/src/main/jniLibs/x86/
           fi
           # build flutter

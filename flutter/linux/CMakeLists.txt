@@ -189,10 +189,10 @@ set(RUSTDESK_LIB_BUILD_TYPE $<IF:$<CONFIG:Debug>,debug,release>)
 string(TOLOWER ${CMAKE_BUILD_TYPE} ${RUSTDESK_LIB_BUILD_TYPE})
 message(STATUS "rustdesk lib build type: ${RUSTDESK_LIB_BUILD_TYPE}")
 
-# [ShopRemote] Cargo.toml name이 shopremote로 변경됨 → liblibshopremote.so
-set(RUSTDESK_LIB "../../target/${RUSTDESK_LIB_BUILD_TYPE}/liblibshopremote.so")
+# [ShopRemote] Cargo.toml [lib] name = "shopremote" → libshopremote.so
+set(RUSTDESK_LIB "../../target/${RUSTDESK_LIB_BUILD_TYPE}/libshopremote.so")
 install(FILES "${RUSTDESK_LIB}" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
-COMPONENT Runtime RENAME librustdesk.so)
+COMPONENT Runtime RENAME libshopremote.so)
 
 # Fully re-copy the assets directory on each build to avoid having stale files
 # from a previous install.
