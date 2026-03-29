@@ -79,7 +79,7 @@ jobs:
             }
     steps:
       - name: Export GitHub Actions cache environment variables
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
@@ -93,7 +93,7 @@ jobs:
 
       - name: Import the codesign cert
         if: env.MACOS_P12_BASE64 != null
-        uses: apple-actions/import-codesign-certs@v1
+        uses: apple-actions/import-codesign-certs@v6
         with:
           p12-file-base64: ${{ secrets.MACOS_P12_BASE64 }}
           p12-password: ${{ secrets.MACOS_P12_PASSWORD }}
@@ -107,7 +107,7 @@ jobs:
 
       - name: Import notarize key
         if: env.MACOS_P12_BASE64 != null
-        uses: timheuer/base64-to-file@v1.2
+        uses: timheuer/base64-to-file@v1.2.4
         with:
           # https://gregoryszorc.com/docs/apple-codesign/stable/apple_codesign_rcodesign.html#notarizing-and-stapling
           fileName: shopremote.json
@@ -129,7 +129,7 @@ jobs:
           brew install llvm create-dmg nasm pkg-config
 
       - name: Install flutter
-        uses: subosito/flutter-action@v2
+        uses: subosito/flutter-action@v2.21.0
         with:
           channel: "stable"
           flutter-version: ${{ matrix.job.flutter }}
@@ -141,7 +141,7 @@ jobs:
           targets: ${{ matrix.job.target }}
           components: "rustfmt"
 
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@v2.8.2
         with:
           prefix-key: ${{ matrix.job.os }}
 
@@ -223,7 +223,7 @@ jobs:
           done
 
       - name: Publish DMG package
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v2.5.0
         with:
           prerelease: true
           tag_name: ${{ env.TAG_NAME }}
@@ -291,7 +291,7 @@ jobs:
                wget
 
       - name: Install flutter
-        uses: subosito/flutter-action@v2
+        uses: subosito/flutter-action@v2.21.0
         with:
           channel: "stable"
           flutter-version: ${{ env.FLUTTER_VERSION }}
@@ -311,7 +311,7 @@ jobs:
           pushd flutter ; flutter pub get ; popd
           ~/.cargo/bin/flutter_rust_bridge_codegen --rust-input ./src/flutter_ffi.rs --dart-output ./flutter/lib/generated_bridge.dart
 
-      - uses: nttld/setup-ndk@v1
+      - uses: nttld/setup-ndk@v1.6.0
         id: setup-ndk
         with:
           ndk-version: ${{ env.NDK_VERSION }}
@@ -411,7 +411,7 @@ jobs:
           BUILD_TOOLS_VERSION: "30.0.2"
 
       - name: Publish signed apk package
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v2.5.0
         with:
           prerelease: true
           tag_name: ${{ env.TAG_NAME }}
