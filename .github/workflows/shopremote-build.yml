@@ -28,7 +28,7 @@ jobs:
     runs-on: macos-15
     steps:
       - name: 소스 체크아웃
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           submodules: recursive
 
@@ -93,7 +93,7 @@ jobs:
           tar czf "ShopRemote-${{ env.VERSION }}-macos.tar.gz" "$APP"
 
       - name: Artifact 업로드
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ShopRemote-macOS
           path: |
@@ -107,7 +107,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: 소스 체크아웃
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           submodules: recursive
 
@@ -196,7 +196,7 @@ jobs:
         run: flutter build apk --release --split-per-abi
 
       - name: Artifact 업로드
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ShopRemote-Android
           path: flutter/build/app/outputs/flutter-apk/app-*-release.apk
@@ -208,7 +208,7 @@ jobs:
     runs-on: windows-2022
     steps:
       - name: 소스 체크아웃
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           submodules: recursive
 
@@ -278,7 +278,7 @@ jobs:
           Compress-Archive -Path flutter\build\windows\x64\runner\Release\* -DestinationPath ShopRemote-${{ env.VERSION }}-windows-x64.zip
 
       - name: Artifact 업로드
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ShopRemote-Windows
           path: ShopRemote-*.zip

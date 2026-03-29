@@ -40,7 +40,7 @@ jobs:
             core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
 
       - name: Checkout source code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v2
@@ -114,7 +114,7 @@ jobs:
           mv ./target/release/shopremote-portable-packer.exe ./SignOutput/shopremote-${{ env.VERSION }}-x86_64.exe
 
       - name: Upload Windows artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: shopremote-windows-x86_64
           path: ./shopremote-windows/
@@ -128,7 +128,7 @@ jobs:
     if: ${{ github.event_name == 'push' || inputs.build_macos }}
     steps:
       - name: Checkout source code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install Flutter
         uses: subosito/flutter-action@v2.12.0
@@ -173,7 +173,7 @@ jobs:
           hdiutil create -volname "ShopRemote" -srcfolder build/macos/Build/Products/Release/ShopRemote.app -ov -format UDZO ../ShopRemote-${{ env.VERSION }}-macos-arm64.dmg
 
       - name: Upload macOS artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: shopremote-macos-arm64
           path: ShopRemote-${{ env.VERSION }}-macos-arm64.dmg
@@ -188,7 +188,7 @@ jobs:
     if: ${{ always() && startsWith(github.ref, 'refs/tags/') }}
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         continue-on-error: true
 
       - name: Create Release
