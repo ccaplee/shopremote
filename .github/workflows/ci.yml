@@ -145,7 +145,7 @@ jobs:
         esac
 
     - name: Setup vcpkg with Github Actions binary cache
-      uses: lukka/run-vcpkg@v11
+      uses: lukka/run-vcpkg@v11.5
       with:
         vcpkgDirectory: /opt/artifacts/vcpkg
         vcpkgGitCommitId: ${{ env.VCPKG_COMMIT_ID }}
@@ -172,7 +172,7 @@ jobs:
         cargo -V
         rustc -V
 
-    - uses: Swatinem/rust-cache@v2.8.2
+    - uses: Swatinem/rust-cache@v2.9.1
 
     - name: Build
       uses: actions-rs/cargo@v1

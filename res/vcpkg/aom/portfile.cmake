@@ -32,6 +32,7 @@ else()
 endif()
 
 set(aom_target_cpu "")
+set(aom_extra_flags "")
 if(VCPKG_TARGET_IS_UWP OR (VCPKG_TARGET_IS_WINDOWS AND VCPKG_TARGET_ARCHITECTURE MATCHES "^arm"))
     # UWP + aom's assembler files result in weirdness and build failures
     # Also, disable assembly on ARM and ARM64 Windows to fix compilation issues.
@@ -42,10 +43,24 @@ if(VCPKG_TARGET_ARCHITECTURE STREQUAL "arm" AND VCPKG_TARGET_IS_LINUX)
   set(aom_target_cpu "-DENABLE_NEON=OFF")
 endif()
 
+if(VCPKG_TARGET_IS_IOS)
+    # Fix __chkstk_darwin linker error on iOS arm64.
+    # Set generic CPU target to avoid generating x86 stack-check assembly,
+    # and set iOS deployment target to 13.0 for consistent linking.
+    set(aom_target_cpu "-DAOM_TARGET_CPU=arm64")
+    set(aom_extra_flags
+        "-DCMAKE_C_FLAGS=-mios-version-min=13.0"
+        "-DCMAKE_CXX_FLAGS=-mios-version-min=13.0"
+        "-DCMAKE_OSX_DEPLOYMENT_TARGET=13.0"
+        "-DCONFIG_RUNTIME_CPU_DETECT=0"
+    )
+endif()
+
 vcpkg_cmake_configure(
     SOURCE_PATH ${SOURCE_PATH}
     OPTIONS
         ${aom_target_cpu}
+        ${aom_extra_flags}
         -DENABLE_DOCS=OFF
         -DENABLE_EXAMPLES=OFF
         -DENABLE_TESTDATA=OFF
