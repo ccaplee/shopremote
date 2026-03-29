@@ -45,14 +45,17 @@ endif()
 
 if(VCPKG_TARGET_IS_IOS)
     # Fix __chkstk_darwin linker error on iOS arm64.
-    # Set generic CPU target to avoid generating x86 stack-check assembly,
-    # and set iOS deployment target to 13.0 for consistent linking.
+    # __chkstk_darwin is a stack-probing function available on macOS but NOT on iOS.
+    # -fno-stack-check prevents the compiler from generating calls to it.
+    # CONFIG_RUNTIME_CPU_DETECT=0 disables runtime CPU detection (not needed on iOS).
+    # CONFIG_SIZE_LIMIT=1 reduces large stack allocations that trigger stack probing.
     set(aom_target_cpu "-DAOM_TARGET_CPU=arm64")
     set(aom_extra_flags
-        "-DCMAKE_C_FLAGS=-mios-version-min=13.0"
-        "-DCMAKE_CXX_FLAGS=-mios-version-min=13.0"
+        "-DCMAKE_C_FLAGS=-mios-version-min=13.0 -fno-stack-check -fno-stack-protector"
+        "-DCMAKE_CXX_FLAGS=-mios-version-min=13.0 -fno-stack-check -fno-stack-protector"
         "-DCMAKE_OSX_DEPLOYMENT_TARGET=13.0"
         "-DCONFIG_RUNTIME_CPU_DETECT=0"
+        "-DCONFIG_SIZE_LIMIT=1"
     )
 endif()
 

@@ -111,12 +111,23 @@ jobs:
 
       # https://github.com/flutter/flutter/issues/155685
       - name: Replace engine with shopremote custom flutter engine
+        continue-on-error: true
         run: |
           flutter doctor -v
           flutter precache --windows
-          Invoke-WebRequest -Uri https://github.com/rustdesk/engine/releases/download/main/windows-x64-release.zip -OutFile windows-x64-release.zip
-          Expand-Archive -Path windows-x64-release.zip -DestinationPath windows-x64-release
-          mv -Force windows-x64-release/*  C:/hostedtoolcache/windows/flutter/stable-${{ env.FLUTTER_VERSION }}-x64/bin/cache/artifacts/engine/windows-x64-release/
+          $destDir = "C:/hostedtoolcache/windows/flutter/stable-${{ env.FLUTTER_VERSION }}-x64/bin/cache/artifacts/engine/windows-x64-release/"
+          try {
+            Invoke-WebRequest -Uri https://github.com/rustdesk/engine/releases/download/main/windows-x64-release.zip -OutFile windows-x64-release.zip
+            Expand-Archive -Path windows-x64-release.zip -DestinationPath windows-x64-release
+            if (Test-Path $destDir) {
+              mv -Force windows-x64-release/* $destDir
+              Write-Host "Custom flutter engine replaced successfully."
+            } else {
+              Write-Host "WARNING: Engine dest path not found - skipping engine replacement for this Flutter version."
+            }
+          } catch {
+            Write-Host "WARNING: Failed to download/apply custom engine - skipping."
+          }
 
       - name: Patch flutter
         shell: bash
@@ -517,6 +528,8 @@ jobs:
           path: ./
 
       - name: Build shopremote lib
+        env:
+          IPHONEOS_DEPLOYMENT_TARGET: "13.0"
         run: |
           rustup target add ${{ matrix.job.target }}
           cargo build --features flutter,hwcodec --release --target aarch64-apple-ios --lib
