@@ -52,7 +52,7 @@ jobs:
 
       - name: 시스템 의존성 설치
         run: |
-          brew install nasm yasm pkg-config llvm opus aom libvpx
+          brew install nasm yasm pkg-config llvm opus aom libvpx libyuv
 
       - name: Flutter 의존성
         working-directory: flutter
@@ -61,7 +61,7 @@ jobs:
         env:
           LIBCLANG_PATH: /opt/homebrew/opt/llvm/lib
           LIBRARY_PATH: /opt/homebrew/lib
-          PKG_CONFIG_PATH: /opt/homebrew/lib/pkgconfig:/opt/homebrew/opt/opus/lib/pkgconfig:/opt/homebrew/opt/libvpx/lib/pkgconfig:/opt/homebrew/opt/aom/lib/pkgconfig
+          PKG_CONFIG_PATH: /opt/homebrew/lib/pkgconfig:/opt/homebrew/opt/opus/lib/pkgconfig:/opt/homebrew/opt/libvpx/lib/pkgconfig:/opt/homebrew/opt/aom/lib/pkgconfig:/opt/homebrew/opt/libyuv/lib/pkgconfig
         run: cargo build --release --features flutter
 
       - name: 빌드된 라이브러리 확인
@@ -150,23 +150,35 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y \
             libclang-dev clang cmake nasm \
-            libopus-dev libaom-dev \
+            libopus-dev libaom-dev libvpx-dev libyuv-dev \
             libssl-dev pkg-config
 
       - name: Flutter 의존성
         working-directory: flutter
         run: flutter pub get
-      - name: opus Android용 준비 (vcpkg 가짜 경로)
+      - name: Android용 vcpkg 의존성 준비 (opus, vpx, yuv)
         run: |
           for TRIPLET in arm64-android arm-android x64-android; do
             mkdir -p /tmp/vcpkg-android/installed/$TRIPLET/include/opus
+            mkdir -p /tmp/vcpkg-android/installed/$TRIPLET/include/vpx
+            mkdir -p /tmp/vcpkg-android/installed/$TRIPLET/include
             mkdir -p /tmp/vcpkg-android/installed/$TRIPLET/lib
-            cp /usr/include/opus/*.h /tmp/vcpkg-android/installed/$TRIPLET/include/opus/
+            # opus 헤더/라이브러리
+            cp /usr/include/opus/*.h /tmp/vcpkg-android/installed/$TRIPLET/include/opus/ 2>/dev/null || true
             cp /usr/lib/x86_64-linux-gnu/libopus.a /tmp/vcpkg-android/installed/$TRIPLET/lib/ 2>/dev/null || true
+            # vpx 헤더/라이브러리
+            if [ -d /usr/include/vpx ]; then
+              cp /usr/include/vpx/*.h /tmp/vcpkg-android/installed/$TRIPLET/include/vpx/
+            fi
+            cp /usr/lib/x86_64-linux-gnu/libvpx.a /tmp/vcpkg-android/installed/$TRIPLET/lib/ 2>/dev/null || true
+            # libyuv - 헤더만 필요 (크로스컴파일용)
+            if [ -d /usr/include/libyuv ]; then
+              cp -r /usr/include/libyuv /tmp/vcpkg-android/installed/$TRIPLET/include/
+              cp /usr/include/libyuv.h /tmp/vcpkg-android/installed/$TRIPLET/include/ 2>/dev/null || true
+            fi
           done
           echo "vcpkg 경로 구성 완료"
-          ls /tmp/vcpkg-android/installed/arm64-android/include/opus/
-          ls /tmp/vcpkg-android/installed/arm64-android/lib/
+          ls /tmp/vcpkg-android/installed/arm64-android/include/
 
       - name: Android Rust 라이브러리 빌드
         env:
