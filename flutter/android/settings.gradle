@@ -23,3 +23,20 @@ plugins {
 }
 
 include ":app"
+
+// AGP 8.5+ requires namespace in all modules.
+// Auto-inject namespace for third-party plugins that lack it (e.g. external_path).
+// Placed in settings.gradle (not build.gradle) to avoid afterEvaluate timing conflicts
+// with evaluationDependsOn(':app') and Flutter's build.gradle upgrader.
+gradle.beforeProject { project ->
+    project.pluginManager.withPlugin('com.android.library') {
+        def manifestFile = project.file("src/main/AndroidManifest.xml")
+        if (manifestFile.exists()) {
+            def manifest = new groovy.xml.XmlSlurper().parse(manifestFile)
+            def pkg = manifest.@package.toString()
+            if (pkg && !pkg.isEmpty()) {
+                project.android.namespace = pkg
+            }
+        }
+    }
+}

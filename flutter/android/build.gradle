@@ -14,26 +14,6 @@ subprojects {
     project.evaluationDependsOn(':app')
 }
 
-// AGP 8.5+ requires namespace in all modules.
-// Auto-inject namespace for third-party plugins that lack it (e.g. external_path).
-subprojects {
-    afterEvaluate { project ->
-        if (project.hasProperty('android')) {
-            def androidExt = project.extensions.findByName('android')
-            if (androidExt != null && (androidExt.namespace == null || androidExt.namespace.isEmpty())) {
-                def manifestFile = file("${project.projectDir}/src/main/AndroidManifest.xml")
-                if (manifestFile.exists()) {
-                    def manifest = new XmlSlurper().parse(manifestFile)
-                    def pkg = manifest.@package.toString()
-                    if (pkg != null && !pkg.isEmpty()) {
-                        androidExt.namespace = pkg
-                    }
-                }
-            }
-        }
-    }
-}
-
 tasks.register("clean", Delete) {
     delete rootProject.buildDir
 }

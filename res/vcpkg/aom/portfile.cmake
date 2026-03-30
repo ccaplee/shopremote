@@ -44,16 +44,23 @@ if(VCPKG_TARGET_ARCHITECTURE STREQUAL "arm" AND VCPKG_TARGET_IS_LINUX)
 endif()
 
 if(VCPKG_TARGET_IS_IOS)
-    # Fix __chkstk_darwin linker error on iOS arm64.
-    # __chkstk_darwin is a stack-probing function available on macOS but NOT on iOS.
-    # -fno-stack-check prevents the compiler from generating calls to it.
-    # CONFIG_RUNTIME_CPU_DETECT=0 disables runtime CPU detection (not needed on iOS).
-    # CONFIG_SIZE_LIMIT=1 reduces large stack allocations that trigger stack probing.
+    # Fix iOS arm64 cross-compilation issues with aom:
+    # 1. __chkstk_darwin is macOS-only; -fno-stack-check prevents calls to it.
+    # 2. feenableexcept is a GNU extension unavailable on iOS; HAVE_FEXCEPT=0 skips it.
+    # 3. Xcode 16+ treats implicit-function-declaration as error; suppress via -Wno-error.
+    # 4. CMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY avoids link errors in try_compile.
+    # 5. ENABLE_NEON_DOTPROD/I8MM=OFF prevents ASM detection issues on iOS.
+    # 6. CONFIG_RUNTIME_CPU_DETECT=0 disables runtime CPU detection (not needed on iOS).
+    # 7. CONFIG_SIZE_LIMIT=1 reduces large stack allocations that trigger stack probing.
     set(aom_target_cpu "-DAOM_TARGET_CPU=arm64")
     set(aom_extra_flags
-        "-DCMAKE_C_FLAGS=-mios-version-min=13.0 -fno-stack-check -fno-stack-protector"
-        "-DCMAKE_CXX_FLAGS=-mios-version-min=13.0 -fno-stack-check -fno-stack-protector"
+        "-DCMAKE_C_FLAGS=-mios-version-min=13.0 -fno-stack-check -fno-stack-protector -Wno-error=implicit-function-declaration"
+        "-DCMAKE_CXX_FLAGS=-mios-version-min=13.0 -fno-stack-check -fno-stack-protector -Wno-error=implicit-function-declaration"
         "-DCMAKE_OSX_DEPLOYMENT_TARGET=13.0"
+        "-DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY"
+        "-DHAVE_FEXCEPT=0"
+        "-DENABLE_NEON_DOTPROD=OFF"
+        "-DENABLE_NEON_I8MM=OFF"
         "-DCONFIG_RUNTIME_CPU_DETECT=0"
         "-DCONFIG_SIZE_LIMIT=1"
     )
