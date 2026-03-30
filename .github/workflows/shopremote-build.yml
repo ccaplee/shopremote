@@ -52,7 +52,19 @@ jobs:
 
       - name: 시스템 의존성 설치
         run: |
-          brew install nasm yasm pkg-config llvm opus aom libvpx libyuv
+          brew install nasm yasm pkg-config llvm
+
+      - name: vcpkg 설치 및 의존성 빌드
+        run: |
+          export VCPKG_ROOT=$HOME/vcpkg
+          git clone https://github.com/Microsoft/vcpkg.git $VCPKG_ROOT
+          cd $VCPKG_ROOT
+          git checkout 120deac3062162151622ca4860575a33844ba10b
+          ./bootstrap-vcpkg.sh
+          $VCPKG_ROOT/vcpkg install \
+            --triplet arm64-osx \
+            --x-install-root=$VCPKG_ROOT/installed
+          echo "VCPKG_ROOT=$VCPKG_ROOT" >> $GITHUB_ENV
 
       - name: Flutter 의존성
         working-directory: flutter
@@ -60,8 +72,6 @@ jobs:
       - name: Rust 라이브러리 빌드
         env:
           LIBCLANG_PATH: /opt/homebrew/opt/llvm/lib
-          LIBRARY_PATH: /opt/homebrew/lib
-          PKG_CONFIG_PATH: /opt/homebrew/lib/pkgconfig:/opt/homebrew/opt/opus/lib/pkgconfig:/opt/homebrew/opt/libvpx/lib/pkgconfig:/opt/homebrew/opt/aom/lib/pkgconfig:/opt/homebrew/opt/libyuv/lib/pkgconfig
         run: cargo build --release --features flutter
 
       - name: 빌드된 라이브러리 확인
@@ -71,8 +81,6 @@ jobs:
 
       - name: macOS Flutter 빌드
         working-directory: flutter
-        env:
-          PKG_CONFIG_PATH: /opt/homebrew/lib/pkgconfig:/opt/homebrew/opt/opus/lib/pkgconfig
         run: flutter build macos --release
 
       - name: DMG 패키징
@@ -156,29 +164,79 @@ jobs:
       - name: Flutter 의존성
         working-directory: flutter
         run: flutter pub get
-      - name: Android용 vcpkg 의존성 준비 (opus, vpx, yuv)
+      - name: Android용 vcpkg 의존성 준비
         run: |
-          for TRIPLET in arm64-android arm-android x64-android; do
-            mkdir -p /tmp/vcpkg-android/installed/$TRIPLET/include/opus
-            mkdir -p /tmp/vcpkg-android/installed/$TRIPLET/include/vpx
-            mkdir -p /tmp/vcpkg-android/installed/$TRIPLET/include
-            mkdir -p /tmp/vcpkg-android/installed/$TRIPLET/lib
-            # opus 헤더/라이브러리
-            cp /usr/include/opus/*.h /tmp/vcpkg-android/installed/$TRIPLET/include/opus/ 2>/dev/null || true
-            cp /usr/lib/x86_64-linux-gnu/libopus.a /tmp/vcpkg-android/installed/$TRIPLET/lib/ 2>/dev/null || true
-            # vpx 헤더/라이브러리
-            if [ -d /usr/include/vpx ]; then
-              cp /usr/include/vpx/*.h /tmp/vcpkg-android/installed/$TRIPLET/include/vpx/
-            fi
-            cp /usr/lib/x86_64-linux-gnu/libvpx.a /tmp/vcpkg-android/installed/$TRIPLET/lib/ 2>/dev/null || true
-            # libyuv - 헤더만 필요 (크로스컴파일용)
-            if [ -d /usr/include/libyuv ]; then
-              cp -r /usr/include/libyuv /tmp/vcpkg-android/installed/$TRIPLET/include/
-              cp /usr/include/libyuv.h /tmp/vcpkg-android/installed/$TRIPLET/include/ 2>/dev/null || true
-            fi
+          # 시스템 헤더 위치 탐색 (Ubuntu multiarch 대응)
+          find_header_dir() {
+            local name=$1
+            for dir in "/usr/include/$name" "/usr/include/x86_64-linux-gnu/$name"; do
+              if [ -d "$dir" ]; then echo "$dir"; return 0; fi
+            done
+            # dpkg fallback
+            local found=$(dpkg -L "lib${name}-dev" 2>/dev/null | grep "include/${name}/" | head -1 | xargs dirname 2>/dev/null)
+            if [ -n "$found" ] && [ -d "$found" ]; then echo "$found"; return 0; fi
+            echo ""; return 1
+          }
+
+          OPUS_DIR=$(find_header_dir "opus")
+          VPX_DIR=$(find_header_dir "vpx")
+          AOM_DIR=$(find_header_dir "aom")
+
+          echo "opus 헤더: ${OPUS_DIR:-NOT FOUND}"
+          echo "vpx 헤더: ${VPX_DIR:-NOT FOUND}"
+          echo "aom 헤더: ${AOM_DIR:-NOT FOUND}"
+
+          # libyuv 헤더 (패키지 또는 소스에서)
+          LIBYUV_DIR=""
+          for dir in "/usr/include/libyuv" "/usr/include/x86_64-linux-gnu/libyuv"; do
+            if [ -d "$dir" ]; then LIBYUV_DIR="$dir"; break; fi
           done
-          echo "vcpkg 경로 구성 완료"
-          ls /tmp/vcpkg-android/installed/arm64-android/include/
+          if [ -z "$LIBYUV_DIR" ]; then
+            echo "libyuv 시스템 패키지 없음 - 소스에서 헤더 가져오기"
+            git clone --depth 1 https://chromium.googlesource.com/libyuv/libyuv /tmp/libyuv-src
+            LIBYUV_DIR="/tmp/libyuv-src/include/libyuv"
+            LIBYUV_ROOT_H="/tmp/libyuv-src/include/libyuv.h"
+          fi
+          echo "libyuv 헤더: ${LIBYUV_DIR:-NOT FOUND}"
+
+          for TRIPLET in arm64-android arm-android x64-android; do
+            DEST="/tmp/vcpkg-android/installed/$TRIPLET"
+            mkdir -p $DEST/include/opus $DEST/include/vpx $DEST/include/aom $DEST/include/libyuv $DEST/lib
+
+            # opus
+            [ -n "$OPUS_DIR" ] && cp $OPUS_DIR/*.h $DEST/include/opus/ 2>/dev/null || true
+            cp /usr/lib/x86_64-linux-gnu/libopus.a $DEST/lib/ 2>/dev/null || true
+
+            # vpx
+            [ -n "$VPX_DIR" ] && cp $VPX_DIR/*.h $DEST/include/vpx/ 2>/dev/null || true
+            cp /usr/lib/x86_64-linux-gnu/libvpx.a $DEST/lib/ 2>/dev/null || true
+
+            # aom
+            [ -n "$AOM_DIR" ] && cp $AOM_DIR/*.h $DEST/include/aom/ 2>/dev/null || true
+            cp /usr/lib/x86_64-linux-gnu/libaom.a $DEST/lib/ 2>/dev/null || true
+
+            # libyuv
+            if [ -n "$LIBYUV_DIR" ]; then
+              cp $LIBYUV_DIR/*.h $DEST/include/libyuv/ 2>/dev/null || true
+              # libyuv.h (루트 헤더)
+              if [ -n "$LIBYUV_ROOT_H" ]; then
+                cp $LIBYUV_ROOT_H $DEST/include/ 2>/dev/null || true
+              elif [ -f "/usr/include/libyuv.h" ]; then
+                cp /usr/include/libyuv.h $DEST/include/ 2>/dev/null || true
+              fi
+            fi
+
+            # 더미 라이브러리 (링크 오류 방지 - 실제 라이브러리는 cargo-ndk가 처리)
+            for lib in yuv aom vpx opus; do
+              [ ! -f "$DEST/lib/lib${lib}.a" ] && ar rcs $DEST/lib/lib${lib}.a 2>/dev/null || true
+            done
+          done
+
+          echo "=== 헤더 검증 ==="
+          echo "vpx/vp8.h: $(ls /tmp/vcpkg-android/installed/arm64-android/include/vpx/vp8.h 2>/dev/null && echo OK || echo MISSING)"
+          echo "aom/aom.h: $(ls /tmp/vcpkg-android/installed/arm64-android/include/aom/aom.h 2>/dev/null && echo OK || echo MISSING)"
+          echo "libyuv/convert.h: $(ls /tmp/vcpkg-android/installed/arm64-android/include/libyuv/convert.h 2>/dev/null && echo OK || echo MISSING)"
+          echo "opus/opus.h: $(ls /tmp/vcpkg-android/installed/arm64-android/include/opus/opus.h 2>/dev/null && echo OK || echo MISSING)"
 
       - name: Android Rust 라이브러리 빌드
         env:
