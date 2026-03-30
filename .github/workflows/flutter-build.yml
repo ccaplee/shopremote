@@ -294,10 +294,9 @@ jobs:
 
   # The fallback for the flutter version, we use Sciter for 32bit Windows.
   build-for-windows-sciter:
+    if: false # temporarily disabled — i686 has pre-existing Rust panic
     name: ${{ matrix.job.target }} (${{ matrix.job.os }})
     runs-on: ${{ matrix.job.os }}
-    # Temporarily disable this action due to additional test is needed.
-    # if: false
     strategy:
       fail-fast: false
       matrix:
@@ -444,7 +443,7 @@ jobs:
             ./SignOutput/shopremote-*.exe
 
   build-shopremote-ios:
-    if: ${{ inputs.upload-artifact }}
+    if: false # temporarily disabled — focusing on macOS/Windows/Android
     name: build shopremote ios ipa
     runs-on: ${{ matrix.job.os }}
     needs: [generate-bridge]
@@ -792,7 +791,7 @@ jobs:
     needs:
       - build-for-macOS
       - build-for-windows-flutter
-      - build-for-windows-sciter
+      # - build-for-windows-sciter  # temporarily disabled
     runs-on: ubuntu-latest
     if: ${{ inputs.upload-artifact }}
     steps:
@@ -1304,6 +1303,7 @@ jobs:
             signed-apk/shopremote-${{ env.VERSION }}-universal${{ env.suffix }}.apk
 
   build-shopremote-linux:
+    if: false # temporarily disabled — focusing on macOS/Windows/Android
     needs: [generate-bridge]
     name: build shopremote linux ${{ matrix.job.target }}
     runs-on: ${{ matrix.job.on }}
@@ -1641,7 +1641,7 @@ jobs:
             res/shopremote-${{ env.VERSION }}*.zst
 
   build-shopremote-linux-sciter:
-    if: ${{ inputs.upload-artifact }}
+    if: false # temporarily disabled — focusing on macOS/Windows/Android
     runs-on: ${{ matrix.job.on }}
     name: build-shopremote-linux-sciter ${{ matrix.job.target }}
     strategy:
@@ -1872,7 +1872,7 @@ jobs:
     name: Build appimage ${{ matrix.job.target }}
     needs: [build-shopremote-linux]
     runs-on: ubuntu-22.04
-    if: ${{ inputs.upload-artifact }}
+    if: false # temporarily disabled — depends on build-shopremote-linux
     strategy:
       fail-fast: false
       matrix:

@@ -93,7 +93,7 @@ fn password_is_empty_or_not_hashed(permanent_password_storage: &str) -> bool {
 
 #[cfg(target_os = "macos")]
 lazy_static::lazy_static! {
-    pub static ref ORG: RwLock<String> = RwLock::new("com.carriez".to_owned());
+    pub static ref ORG: RwLock<String> = RwLock::new("com.shopremote".to_owned());
 }
 
 type Size = (i32, i32, i32, i32);
@@ -136,16 +136,16 @@ lazy_static::lazy_static! {
     pub static ref APP_HOME_DIR: RwLock<String> = Default::default();
 }
 
-pub const LINK_DOCS_HOME: &str = "https://rustdesk.com/docs/en/";
-pub const LINK_DOCS_X11_REQUIRED: &str = "https://rustdesk.com/docs/en/manual/linux/#x11-required";
+pub const LINK_DOCS_HOME: &str = "https://ai.ilv.co.kr/docs/";
+pub const LINK_DOCS_X11_REQUIRED: &str = "https://ai.ilv.co.kr/docs/linux/#x11-required";
 pub const LINK_HEADLESS_LINUX_SUPPORT: &str =
-    "https://github.com/rustdesk/rustdesk/wiki/Headless-Linux-Support";
+    "https://ai.ilv.co.kr/docs/headless-linux-support";
 
 lazy_static::lazy_static! {
     pub static ref HELPER_URL: HashMap<&'static str, &'static str> = HashMap::from([
-        ("rustdesk docs home", LINK_DOCS_HOME),
-        ("rustdesk docs x11-required", LINK_DOCS_X11_REQUIRED),
-        ("rustdesk x11 headless", LINK_HEADLESS_LINUX_SUPPORT),
+        ("shopremote docs home", LINK_DOCS_HOME),
+        ("shopremote docs x11-required", LINK_DOCS_X11_REQUIRED),
+        ("shopremote x11 headless", LINK_HEADLESS_LINUX_SUPPORT),
         ]);
 }
 

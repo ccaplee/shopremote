@@ -51,7 +51,8 @@ if(VCPKG_TARGET_IS_IOS)
     # 4. CMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY avoids link errors in try_compile.
     # 5. ENABLE_NEON_DOTPROD/I8MM=OFF prevents ASM detection issues on iOS.
     # 6. CONFIG_RUNTIME_CPU_DETECT=0 disables runtime CPU detection (not needed on iOS).
-    # 7. CONFIG_SIZE_LIMIT=1 reduces large stack allocations that trigger stack probing.
+    # Note: -fno-stack-check already prevents __chkstk_darwin calls, so CONFIG_SIZE_LIMIT
+    #   is not needed (and would require DECODE_HEIGHT/WIDTH_LIMIT to be set).
     set(aom_target_cpu "-DAOM_TARGET_CPU=arm64")
     set(aom_extra_flags
         "-DCMAKE_C_FLAGS=-mios-version-min=13.0 -fno-stack-check -fno-stack-protector -Wno-error=implicit-function-declaration"
@@ -62,7 +63,6 @@ if(VCPKG_TARGET_IS_IOS)
         "-DENABLE_NEON_DOTPROD=OFF"
         "-DENABLE_NEON_I8MM=OFF"
         "-DCONFIG_RUNTIME_CPU_DETECT=0"
-        "-DCONFIG_SIZE_LIMIT=1"
     )
 endif()
 
